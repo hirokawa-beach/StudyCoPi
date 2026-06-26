@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>StudyCoPi — 勉強スケジュール管理</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-header">
+  <div>
+    <h1>StudyCoPi</h1>
+    <span>勉強スケジュール管理</span>
+  </div>
+  <button type="button" class="btn btn-sm mobile-header-btn" onclick="showView('data')" aria-label="データ保存">💾</button>
+</div>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>StudyCoPi</h1>
+      <span>勉強スケジュール管理</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">メイン</div>
+      <div class="nav-item active" onclick="showView('dashboard')" id="nav-dashboard">
+        <span class="nav-icon">📊</span> ダッシュボード
+      </div>
+      <div class="nav-item" onclick="showView('schedule')" id="nav-schedule">
+        <span class="nav-icon">📅</span> スケジュール
+      </div>
+      <div class="nav-item" onclick="showView('timetable')" id="nav-timetable">
+        <span class="nav-icon">🗓</span> タイムテーブル
+      </div>
+      <div class="nav-section">管理</div>
+      <div class="nav-item" onclick="showView('exams')" id="nav-exams">
+        <span class="nav-icon">📝</span> 考査時間割
+      </div>
+      <div class="nav-item" onclick="showView('subjects')" id="nav-subjects">
+        <span class="nav-icon">🎨</span> 教科管理
+      </div>
+      <div class="nav-item" onclick="showView('hours')" id="nav-hours">
+        <span class="nav-icon">⏱</span> 勉強時間
+      </div>
+      <div class="nav-item" onclick="showView('focus')" id="nav-focus">
+        <span class="nav-icon">🎯</span> 集中モード
+      </div>
+      <div class="nav-section">その他</div>
+      <div class="nav-item" onclick="showView('data')" id="nav-data">
+        <span class="nav-icon">💾</span> データ保存
+      </div>
+    </nav>
+  </aside>
+
+  <main class="main">
+
+    <!-- Dashboard -->
+    <div class="view active" id="view-dashboard">
+      <div class="view-title">ダッシュボード</div>
+      <div class="view-subtitle">今週の勉強状況をひと目で確認</div>
+      <div class="stats-grid" id="dash-stats"></div>
+      <!-- Next exam countdown -->
+      <div id="dash-exam-countdown"></div>
+      <div class="section-header">
+        <span class="section-title">直近のスケジュール</span>
+        <button class="btn btn-sm" onclick="showView('schedule')">すべて見る →</button>
+      </div>
+      <div class="table-wrap">
+        <table class="card-table">
+          <thead><tr><th>日時</th><th>教科</th><th>内容</th><th>予定</th><th>実績</th><th>状況</th><th>記録</th></tr></thead>
+          <tbody id="dash-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Schedule list -->
+    <div class="view" id="view-schedule">
+      <div class="view-title">スケジュール一覧</div>
+      <div class="view-subtitle">登録した勉強予定と実績</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="openModal('schedule')">＋ 追加</button>
+        <select id="filter-subject" onchange="renderSchedule()" style="width:auto">
+          <option value="">すべての教科</option>
+        </select>
+        <select id="filter-status" onchange="renderSchedule()" style="width:auto">
+          <option value="">すべての状況</option>
+          <option value="done">完了</option>
+          <option value="partial">一部</option>
+          <option value="miss">未実施</option>
+          <option value="pending">未記録</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="card-table">
+          <thead><tr><th>日時</th><th>教科</th><th>内容</th><th>予定時間</th><th>実績時間</th><th>状況</th><th>メモ</th><th>操作</th></tr></thead>
+          <tbody id="schedule-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Timetable -->
+    <div class="view" id="view-timetable">
+      <div class="view-title">週間タイムテーブル</div>
+      <div class="view-subtitle">1週間の予定をビジュアルで確認</div>
+      <div class="week-nav">
+        <button class="btn btn-sm" onclick="changeWeek(-1)">← 前週</button>
+        <span class="week-label" id="week-label"></span>
+        <button class="btn btn-sm" onclick="changeWeek(1)">次週 →</button>
+        <button class="btn btn-sm" onclick="goToday()">今週</button>
+      </div>
+      <div class="timetable" id="timetable-grid"></div>
+      <div class="mobile-day-list" id="mobile-day-list"></div>
+    </div>
+
+    <!-- Exams -->
+    <div class="view" id="view-exams">
+      <div class="view-title">考査時間割</div>
+      <div class="view-subtitle">テスト・考査の目標スケジュール</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="openModal('exam')">＋ 考査を追加</button>
+      </div>
+      <div class="exam-grid" id="exam-grid"></div>
+    </div>
+
+    <!-- Subjects -->
+    <div class="view" id="view-subjects">
+      <div class="view-title">教科管理</div>
+      <div class="view-subtitle">教科の登録・編集・並び替え</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="openModal('subject')">＋ 教科を追加</button>
+        <span style="font-size:12px;color:var(--text3);align-self:center">↕ ドラッグで並び替え</span>
+      </div>
+      <div class="table-wrap">
+        <table class="card-table">
+          <thead><tr><th></th><th>カラー</th><th>教科名</th><th>予定時間</th><th>実績時間</th><th>操作</th></tr></thead>
+          <tbody id="subjects-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Hours -->
+    <div class="view" id="view-hours">
+      <div class="view-title">勉強時間</div>
+      <div class="view-subtitle">教科別の累計勉強時間</div>
+      <!-- Period selector -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="hours-period-bar">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:600;color:var(--text2)">集計期間</span>
+            <select id="hours-period-preset" onchange="onPeriodPresetChange()" style="width:auto">
+              <option value="all">全期間</option>
+              <option value="week">今週</option>
+              <option value="month">今月</option>
+              <option value="custom">カスタム</option>
+              <optgroup label="考査プリセット" id="exam-preset-group"></optgroup>
+            </select>
+          </div>
+          <div id="hours-custom-range" style="display:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
+            <input type="date" id="hours-from" onchange="renderHours()" style="width:auto">
+            <span style="color:var(--text2)">〜</span>
+            <input type="date" id="hours-to" onchange="renderHours()" style="width:auto">
+          </div>
+        </div>
+      </div>
+      <div class="stats-grid" id="hours-stats"></div>
+      <div class="card">
+        <div class="section-title" style="margin-bottom:16px">教科別内訳</div>
+        <div class="hours-toggle-row">
+          <button class="btn btn-sm hours-toggle-btn active" id="hours-btn-actual" onclick="setHoursMode('actual')">実績時間</button>
+          <button class="btn btn-sm hours-toggle-btn" id="hours-btn-planned" onclick="setHoursMode('planned')">予定時間</button>
+          <button class="btn btn-sm hours-toggle-btn" id="hours-btn-both" onclick="setHoursMode('both')">両方</button>
+        </div>
+        <div class="subject-hours-list" id="hours-list"></div>
+      </div>
+    </div>
+
+    <!-- Focus mode -->
+    <div class="view" id="view-focus">
+      <div class="view-title">集中モード</div>
+      <div class="view-subtitle">スマホを置いて勉強に集中しよう</div>
+      <div class="focus-setup" id="focus-setup">
+        <div class="card" style="max-width:400px;margin:0 auto">
+          <div class="form-group" style="margin-bottom:14px">
+            <label>教科</label>
+            <select id="focus-subject"></select>
+          </div>
+          <div class="form-group" style="margin-bottom:14px">
+            <label>スケジュールに紐付ける（任意）</label>
+            <select id="focus-schedule-link">
+              <option value="">紐付けなし</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:20px">
+            <label>タイマー設定（分）</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm focus-preset-btn" onclick="setFocusTimer(25)">25分</button>
+              <button class="btn btn-sm focus-preset-btn" onclick="setFocusTimer(45)">45分</button>
+              <button class="btn btn-sm focus-preset-btn" onclick="setFocusTimer(60)">60分</button>
+              <button class="btn btn-sm focus-preset-btn" onclick="setFocusTimer(90)">90分</button>
+              <input type="number" id="focus-minutes" value="25" min="1" max="300" style="width:80px" oninput="updateFocusMinutes()">
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" onclick="startFocus()">🎯 集中モード開始</button>
+        </div>
+      </div>
+      <!-- Active focus screen -->
+      <div class="focus-active" id="focus-active" style="display:none">
+        <div class="focus-subject-label" id="focus-active-subject"></div>
+        <div class="focus-timer-display" id="focus-timer-display">00:00</div>
+        <div class="focus-progress-ring">
+          <svg viewBox="0 0 120 120" width="160" height="160">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="var(--border)" stroke-width="6"/>
+            <circle cx="60" cy="60" r="54" fill="none" stroke="var(--accent)" stroke-width="6"
+              stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3"
+              id="focus-ring" transform="rotate(-90 60 60)"/>
+          </svg>
+        </div>
+        <div class="focus-elapsed" id="focus-elapsed">経過: 0分</div>
+        <div class="focus-btn-row">
+          <button class="btn" onclick="pauseFocus()" id="focus-pause-btn">⏸ 一時停止</button>
+          <button class="btn btn-danger" onclick="stopFocus()">⏹ 終了・記録</button>
+        </div>
+        <button class="btn btn-sm" style="margin-top:8px;opacity:0.6" onclick="enterFullscreen()">⛶ 全画面</button>
+      </div>
+      <!-- Fullscreen overlay -->
+      <div class="focus-fullscreen-overlay" id="focus-fullscreen-overlay" style="display:none" onclick="exitFullscreenOverlay(event)">
+        <div class="focus-fs-content">
+          <div class="focus-fs-subject" id="focus-fs-subject"></div>
+          <div class="focus-fs-timer" id="focus-fs-timer">00:00</div>
+          <div class="focus-fs-elapsed" id="focus-fs-elapsed"></div>
+          <div style="display:flex;gap:12px;margin-top:32px">
+            <button class="btn" style="flex:1;justify-content:center;padding:12px" onclick="pauseFocus()">⏸ 一時停止</button>
+            <button class="btn btn-danger" style="flex:1;justify-content:center;padding:12px" onclick="stopFocus()">⏹ 終了</button>
+          </div>
+          <p style="margin-top:20px;font-size:12px;opacity:0.5">画面外をタップすると通常表示に戻ります</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data backup -->
+    <div class="view" id="view-data">
+      <div class="view-title">データ保存</div>
+      <div class="view-subtitle">設定・スケジュールをファイルとしてデバイスに保存</div>
+      <div class="stats-grid" id="data-stats"></div>
+      <div class="card data-card">
+        <div class="section-title">バックアップをダウンロード</div>
+        <p class="data-desc">教科・スケジュール・考査のデータを JSON ファイルとして保存します。機種変更やブラウザを変えるときに使えます。</p>
+        <button type="button" class="btn btn-primary" onclick="exportData()">⬇ ダウンロード</button>
+      </div>
+      <div class="card data-card">
+        <div class="section-title">バックアップから復元</div>
+        <p class="data-desc">以前ダウンロードしたファイルを読み込みます。現在のデータは上書きされます。</p>
+        <input type="file" id="import-file" accept=".json,application/json" hidden onchange="importData(this)">
+        <button type="button" class="btn" onclick="document.getElementById('import-file').click()">⬆ ファイルを選択</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modals -->
+<div class="modal-backdrop" id="modal-backdrop" onclick="closeModal(event)">
+  <div class="modal" id="modal-content">
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+
+<div class="mobile-bottom-nav">
+  <button type="button" data-view="dashboard" onclick="showView('dashboard')">📊<br>Home</button>
+  <button type="button" data-view="schedule" onclick="showView('schedule')">📅<br>予定</button>
+  <button type="button" data-view="timetable" onclick="showView('timetable')">🗓<br>週</button>
+  <button type="button" data-view="exams" onclick="showView('exams')">📝<br>考査</button>
+  <button type="button" data-view="focus" onclick="showView('focus')">🎯<br>集中</button>
+  <button type="button" data-view="hours" onclick="showView('hours')">⏱<br>時間</button>
+</div>
+
+</body>
+</html>
