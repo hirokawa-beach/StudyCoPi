@@ -12,7 +12,10 @@
     <h1>StudyCoPi</h1>
     <span>勉強スケジュール管理</span>
   </div>
-  <button type="button" class="btn btn-sm mobile-header-btn" onclick="showView('data')" aria-label="データ保存">💾</button>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button type="button" class="btn btn-sm mobile-header-btn" onclick="showView('data')" aria-label="データ保存">💾</button>
+    <button class="btn btn-sm mobile-only-btn" data-view="settings" onclick="showView('settings')">⚙️ 設定</button>
+  </div>
 </div>
 <div class="app">
   <!-- Sidebar -->
@@ -24,23 +27,22 @@
     <nav class="sidebar-nav">
       <div class="nav-section">メイン</div>
       <div class="nav-item active" onclick="showView('dashboard')" id="nav-dashboard">
-        <span class="nav-icon">📊</span> ダッシュボード
+        <span class="nav-icon">🏠</span> ダッシュボード
       </div>
       <div class="nav-item" onclick="showView('schedule')" id="nav-schedule">
         <span class="nav-icon">📅</span> スケジュール
       </div>
       <div class="nav-item" onclick="showView('timetable')" id="nav-timetable">
-        <span class="nav-icon">🗓</span> タイムテーブル
+        <span class="nav-icon">📋</span> タイムテーブル
       </div>
-      <div class="nav-section">管理</div>
-      <div class="nav-item" onclick="showView('exams')" id="nav-exams">
+      <!-- <div class="nav-item" onclick="showView('exams')" id="nav-exams">
         <span class="nav-icon">📝</span> 考査時間割
       </div>
       <div class="nav-item" onclick="showView('subjects')" id="nav-subjects">
         <span class="nav-icon">🎨</span> 教科管理
-      </div>
+      </div> -->
       <div class="nav-item" onclick="showView('hours')" id="nav-hours">
-        <span class="nav-icon">⏱</span> 勉強時間
+        <span class="nav-icon">📊</span> 統計
       </div>
       <div class="nav-item" onclick="showView('focus')" id="nav-focus">
         <span class="nav-icon">🎯</span> 集中モード
@@ -48,6 +50,9 @@
       <div class="nav-section">その他</div>
       <div class="nav-item" onclick="showView('data')" id="nav-data">
         <span class="nav-icon">💾</span> データ保存
+      </div>
+      <div class="nav-item" onclick="showView('settings')" id="nav-settings">
+        <span class="nav-icon">⚙️</span> 設定
       </div>
     </nav>
   </aside>
@@ -76,9 +81,10 @@
     <!-- Schedule list -->
     <div class="view" id="view-schedule">
       <div class="view-title">スケジュール一覧</div>
-      <div class="view-subtitle">登録した勉強予定と実績</div>
+      <div class="view-subtitle">登録した予定と実績</div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="openModal('schedule')">＋ 追加</button>
+        <button class="btn" id="toggle-exam-btn" onclick="toggleExamVisibility()">考査を非表示</button>
         <select id="filter-subject" onchange="renderSchedule()" style="width:auto">
           <option value="">すべての教科</option>
         </select>
@@ -90,12 +96,14 @@
           <option value="pending">未記録</option>
         </select>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap schedule-table-wrap">
         <table class="card-table">
           <thead><tr><th>日時</th><th>教科</th><th>内容</th><th>予定時間</th><th>実績時間</th><th>状況</th><th>メモ</th><th>操作</th></tr></thead>
           <tbody id="schedule-table"></tbody>
         </table>
       </div>
+      <!-- モバイル専用カード表示 -->
+      <div class="schedule-mobile-list" id="schedule-mobile-list"></div>
     </div>
 
     <!-- Timetable -->
@@ -108,7 +116,7 @@
         <button class="btn btn-sm" onclick="changeWeek(1)">次週 →</button>
         <button class="btn btn-sm" onclick="goToday()">今週</button>
       </div>
-      <div class="timetable" id="timetable-grid"></div>
+      <div id="timetable-grid"></div>
       <div class="mobile-day-list" id="mobile-day-list"></div>
     </div>
 
@@ -255,6 +263,39 @@
       </div>
     </div>
 
+    <div id="view-settings" class="view">
+      <div class="view-title">⚙️ 設定</div>
+      <div class="view-subtitle">教科管理・考査予定の設定</div>
+
+      <div class="settings-section">
+        <div class="section-title" style="margin-bottom:12px">🎨 教科管理</div>
+        <div class="view-subtitle">教科の登録・編集・並び替え</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="openModal('subject')">＋ 教科を追加</button>
+          <span style="font-size:12px;color:var(--text3);align-self:center">↕ ドラッグで並び替え</span>
+        </div>
+        <div class="table-wrap">
+          <table class="card-table">
+            <thead><tr><th></th><th>カラー</th><th>教科名</th><th>予定時間</th><th>実績時間</th><th>操作</th></tr></thead>
+            <tbody id="subjects-table-settings"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <hr style="margin: 24px 0;">
+
+      <!-- 考査予定セクション -->
+      <div class="settings-section">
+        <div class="section-title" style="margin-bottom:12px">📝 考査予定管理</div>
+        <div class="view-subtitle">テスト・考査の目標スケジュール</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="openModal('exam')">＋ 考査を追加</button>
+        </div>
+        <div class="exam-grid" id="exam-grid-settings"></div>
+      </div>
+
+    </div>
+
   </main>
 </div>
 
@@ -268,12 +309,12 @@
 <script src="app.js"></script>
 
 <div class="mobile-bottom-nav">
-  <button type="button" data-view="dashboard" onclick="showView('dashboard')">📊<br>Home</button>
-  <button type="button" data-view="schedule" onclick="showView('schedule')">📅<br>予定</button>
-  <button type="button" data-view="timetable" onclick="showView('timetable')">🗓<br>週</button>
-  <button type="button" data-view="exams" onclick="showView('exams')">📝<br>考査</button>
+  <button type="button" data-view="dashboard" onclick="showView('dashboard')">🏠<br>Home</button>
+  <button type="button" data-view="schedule" onclick="showView('schedule')">📅<br>予定一覧</button>
+  <button type="button" data-view="timetable" onclick="showView('timetable')">📋<br>週</button>
   <button type="button" data-view="focus" onclick="showView('focus')">🎯<br>集中</button>
-  <button type="button" data-view="hours" onclick="showView('hours')">⏱<br>時間</button>
+  <button type="button" data-view="hours" onclick="showView('hours')">📊<br>統計</button>
+  <button type="button" data-view="settings" onclick="showView('settings')">⚙️<br>設定</button>
 </div>
 
 </body>
