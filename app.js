@@ -384,6 +384,106 @@ function renderSchedule() {
         })
         .join("")
     : `<tr class="empty-row"><td colspan="8" class="empty-cell"><div class="empty"><div class="empty-icon">📅</div><p>スケジュールがありません</p></div></td></tr>`;
+
+  // ── モバイル用カード表示 ──────────────────────────────
+  const mobileList = document.getElementById("schedule-mobile-list");
+  if (!mobileList) return;
+  if (!list.length) {
+    mobileList.innerHTML = `<div class="empty"><div class="empty-icon">📅</div><p>スケジュールがありません</p></div>`;
+    return;
+  }
+
+  // 日付でグループ化
+  const groups = {};
+  list.forEach((s) => {
+    const d = new Date(s.datetime);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (!groups[key]) groups[key] = { date: d, items: [] };
+    groups[key].items.push(s);
+  });
+
+  const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  mobileList.innerHTML = Object.entries(groups)
+    .map(([key, g]) => {
+      const gDate = new Date(g.date);
+      gDate.setHours(0, 0, 0, 0);
+      const diff = Math.round((gDate - today) / 86400000);
+      const dayLabel =
+        diff === 0 ? "今日" : diff === 1 ? "明日" : diff === -1 ? "昨日" : "";
+      const dateStr = `${g.date.getMonth() + 1}/${g.date.getDate()}(${dayNames[g.date.getDay()]})`;
+      const isToday = diff === 0;
+
+      const itemsHtml = g.items
+        .map((s) => {
+          if (s.isExam) {
+            const color = s.color || "var(--purple)";
+            return `<div class="scm-card scm-exam" style="border-left-color:${color}">
+          <div class="scm-left">
+            <div class="scm-time">${fmt(s.datetime).split(" ")[1] || ""}</div>
+          </div>
+          <div class="scm-body">
+            <div class="scm-subject" style="color:${color}">📝 ${s.subjectName}</div>
+            ${s.note ? `<div class="scm-note">${s.note}</div>` : ""}
+          </div>
+          <span class="badge badge-exam">考査</span>
+        </div>`;
+          }
+          const subj = subjectById(s.subjectId);
+          const t = new Date(s.datetime);
+          const timeStr = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+          const endMin =
+            t.getHours() * 60 +
+            t.getMinutes() +
+            Math.round((parseFloat(s.duration) || 1) * 60);
+          const endStr = `${String(Math.floor(endMin / 60) % 24).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
+          const actual =
+            s.actualDuration !== undefined && s.actualDuration !== ""
+              ? s.actualDuration
+              : "";
+          return `<div class="scm-card${s.status === "done" ? " scm-done" : s.status === "miss" ? " scm-miss" : ""}" style="border-left-color:${subj.color}">
+        <div class="scm-left">
+          <div class="scm-time">${timeStr}</div>
+          <div class="scm-endtime">〜${endStr}</div>
+          <div class="scm-dur">${s.duration || "-"}h</div>
+        </div>
+        <div class="scm-body">
+          <div class="scm-subject" style="color:${subj.color}">${subj.name}</div>
+          ${s.content ? `<div class="scm-content">${s.content}</div>` : ""}
+          ${s.note ? `<div class="scm-note">${s.note}</div>` : ""}
+          <div class="scm-actual-row">
+            <span style="font-size:11px;color:var(--text3)">実績</span>
+            <input type="number" class="scm-actual-input" value="${actual}" min="0" max="24" step="0.25"
+              onchange="saveActual('${s.id}',this.value)" placeholder="-">
+            <span style="font-size:11px;color:var(--text3)">h</span>
+          </div>
+        </div>
+        <div class="scm-right">
+          <div class="scm-status-btns">
+            <button class="scm-btn-status${s.status === "done" ? " scm-s-done" : ""}" onclick="setStatus('${s.id}','done')" title="完了">✓</button>
+            <button class="scm-btn-status${s.status === "partial" ? " scm-s-partial" : ""}" onclick="setStatus('${s.id}','partial')" title="一部">△</button>
+            <button class="scm-btn-status${s.status === "miss" ? " scm-s-miss" : ""}" onclick="setStatus('${s.id}','miss')" title="未実施">✗</button>
+          </div>
+          <div class="scm-ops">
+            <button class="btn btn-sm" onclick="editSchedule('${s.id}')">編集</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteSchedule('${s.id}')">削除</button>
+          </div>
+        </div>
+      </div>`;
+        })
+        .join("");
+
+      return `<div class="scm-group${isToday ? " scm-group-today" : ""}">
+      <div class="scm-date-header">
+        <span class="scm-date-str">${dateStr}</span>
+        ${dayLabel ? `<span class="scm-day-label${isToday ? " scm-today-label" : ""}">${dayLabel}</span>` : ""}
+      </div>
+      ${itemsHtml}
+    </div>`;
+    })
+    .join("");
 }
 
 // ── Timetable ─────────────────────────────────────────
@@ -398,66 +498,104 @@ function renderTimetable() {
     d.setDate(base.getDate() + i);
     return d;
   });
-  const start = 7,
-    end = 22;
+  const START_HOUR = 6;
+  const END_HOUR = 23;
+  const TOTAL_HOURS = END_HOUR - START_HOUR;
+  const ROW_H = 52; // px per hour
+  const HEADER_H = 40; // px for day header
+  const GRID_H = TOTAL_HOURS * ROW_H;
 
   document.getElementById("week-label").textContent =
     `${dates[0].getMonth() + 1}/${dates[0].getDate()} 〜 ${dates[6].getMonth() + 1}/${dates[6].getDate()}`;
 
-  let html = '<div class="tt-head"></div>';
+  function toY(datetimeStr) {
+    const d = new Date(datetimeStr);
+    return (
+      ((d.getHours() * 60 + d.getMinutes() - START_HOUR * 60) / 60) * ROW_H
+    );
+  }
+  function durToH(durationVal) {
+    return (parseFloat(durationVal) || 1) * ROW_H;
+  }
+
+  // 時間軸 HTML（絶対位置で各 hour ラベルを配置）
+  let axisHtml = "";
+  for (let h = START_HOUR; h <= END_HOUR; h++) {
+    const y = (h - START_HOUR) * ROW_H;
+    axisHtml += `<div class="tt2-tick" style="top:${y}px">${h}:00</div>`;
+  }
+
+  // 1時間ごとの横線 HTML
+  let linesHtml = "";
+  for (let i = 0; i <= TOTAL_HOURS; i++) {
+    linesHtml += `<div class="tt2-hour-line" style="top:${i * ROW_H}px"></div>`;
+  }
+
+  // 各曜日カラム
+  let colsHtml = "";
   dates.forEach((d, i) => {
     const isToday = d.toDateString() === now.toDateString();
-    html += `<div class="tt-head" style="${isToday ? "color:var(--accent);background:var(--accent-bg)" : ""}">${days[i]}<br><span style="font-size:12px;font-weight:400">${d.getDate()}</span></div>`;
-  });
-  for (let h = start; h < end; h++) {
-    html += `<div class="tt-time">${h}:00</div>`;
-    dates.forEach((d) => {
-      const isToday = d.toDateString() === now.toDateString();
-      const cellDate = new Date(d);
-      cellDate.setHours(h, 0, 0, 0);
-      const cellEnd = new Date(d);
-      cellEnd.setHours(h + 1, 0, 0, 0);
 
-      // スケジュール取得
-      const items = schedules.filter((s) => {
-        const sd = new Date(s.datetime);
-        return (
-          sd >= cellDate &&
-          sd < cellEnd &&
-          sd.toDateString() === d.toDateString()
-        );
-      });
+    const daySchedules = schedules
+      .filter((s) => new Date(s.datetime).toDateString() === d.toDateString())
+      .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
 
-      // 考査取得
-      const examItems = exams.filter((e) => {
-        const ed = new Date(e.date + "T" + (e.startTime || "00:00"));
-        return (
-          ed >= cellDate &&
-          ed < cellEnd &&
-          ed.toDateString() === d.toDateString()
-        );
-      });
+    const dayExams = exams.filter(
+      (e) => new Date(e.date + "T00:00").toDateString() === d.toDateString(),
+    );
 
-      let inner = "";
+    let blocksHtml = linesHtml;
 
-      // 考査のブロックを描画
-      examItems.forEach((e) => {
-        const matchedSubj = subjects.find((s) => s.name === e.subject);
-        const color = matchedSubj ? matchedSubj.color : "var(--purple)";
-        inner += `<div class="tt-exam-block" style="color:${color}; border-color:${color};" title="📝考査: ${e.subject}">📝${e.subject}</div>`;
-      });
-
-      // スケジュールのブロックを描画
-      items.forEach((s) => {
-        const subj = subjectById(s.subjectId);
-        const alpha =
-          s.status === "done" ? "cc" : s.status === "miss" ? "44" : "";
-        inner += `<div class="tt-block" style="background:${subj.color}${alpha};color:#fff" title="${subj.name}: ${s.content || ""}">${subj.name}</div>`;
-      });
-      html += `<div class="tt-cell ${isToday ? "tt-today" : ""}">${inner}</div>`;
+    // 考査ブロック
+    dayExams.forEach((e) => {
+      const matchedSubj = subjects.find((s) => s.name === e.subject);
+      const color = matchedSubj ? matchedSubj.color : "var(--purple)";
+      const sMins = e.startTime
+        ? parseInt(e.startTime.split(":")[0]) * 60 +
+          parseInt(e.startTime.split(":")[1])
+        : START_HOUR * 60;
+      const eMins = e.endTime
+        ? parseInt(e.endTime.split(":")[0]) * 60 +
+          parseInt(e.endTime.split(":")[1])
+        : sMins + 60;
+      const top = Math.max(0, ((sMins - START_HOUR * 60) / 60) * ROW_H);
+      const height = Math.max(ROW_H * 0.4, ((eMins - sMins) / 60) * ROW_H);
+      blocksHtml += `<div class="tt2-block tt2-exam-block" style="top:${top}px;height:${height}px;border-color:${color};color:${color}" title="📝考査: ${e.subject}">
+        <span class="tt2-block-name">📝${e.subject}</span>
+        <span class="tt2-block-time">${e.startTime || ""}${e.endTime ? "〜" + e.endTime : ""}</span>
+      </div>`;
     });
-  }
-  document.getElementById("timetable-grid").innerHTML = html;
+
+    // スケジュールブロック
+    daySchedules.forEach((s) => {
+      const subj = subjectById(s.subjectId);
+      const top = Math.max(0, toY(s.datetime));
+      const height = Math.max(ROW_H * 0.4, durToH(s.duration));
+      const alpha =
+        s.status === "done" ? "cc" : s.status === "miss" ? "55" : "";
+      const sd = new Date(s.datetime);
+      const timeStr = `${String(sd.getHours()).padStart(2, "0")}:${String(sd.getMinutes()).padStart(2, "0")}`;
+      blocksHtml += `<div class="tt2-block" style="top:${top}px;height:${height}px;background:${subj.color}${alpha}" title="${subj.name}: ${s.content || ""} (${timeStr}〜)">
+        <span class="tt2-block-name">${subj.name}</span>
+        <span class="tt2-block-time">${timeStr}</span>
+        ${s.content ? `<span class="tt2-block-content">${s.content}</span>` : ""}
+      </div>`;
+    });
+
+    colsHtml += `<div class="tt2-col${isToday ? " tt2-today" : ""}">
+      <div class="tt2-col-header${isToday ? " tt2-col-header-today" : ""}" style="height:${HEADER_H}px">${days[i]}<br><span>${d.getDate()}</span></div>
+      <div class="tt2-col-body" style="height:${GRID_H}px">${blocksHtml}</div>
+    </div>`;
+  });
+
+  document.getElementById("timetable-grid").innerHTML = `
+    <div class="tt2-wrap">
+      <div class="tt2-axis" style="padding-top:${HEADER_H}px">
+        <div class="tt2-axis-inner" style="position:relative;height:${GRID_H}px">${axisHtml}</div>
+      </div>
+      <div class="tt2-cols">${colsHtml}</div>
+    </div>`;
+
   renderMobileDayList(base, now);
 }
 
@@ -474,21 +612,66 @@ function renderMobileDayList(base, now) {
     const d = new Date(base);
     d.setDate(base.getDate() + i);
     const isToday = d.toDateString() === now.toDateString();
-    const dayItems = schedules
+    const daySchedules = schedules
       .filter((s) => new Date(s.datetime).toDateString() === d.toDateString())
       .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
-    html += `<div class="mobile-day-card"${isToday ? ' style="border-color:var(--accent-light);background:var(--accent-bg)"' : ""}>
-      <strong>${days[i]} ${d.getMonth() + 1}/${d.getDate()}${isToday ? " (今日)" : ""}</strong>`;
-    if (!dayItems.length) {
-      html += '<div style="margin-top:6px;color:var(--text3)">予定なし</div>';
-    } else
-      dayItems.forEach((s) => {
+    const dayExams = exams.filter(
+      (e) => new Date(e.date + "T00:00").toDateString() === d.toDateString(),
+    );
+
+    html += `<div class="mobile-day-card${isToday ? " mobile-day-today" : ""}">
+      <div class="mobile-day-header">
+        <strong>${days[i]} ${d.getMonth() + 1}/${d.getDate()}${isToday ? " <span class='today-badge'>今日</span>" : ""}</strong>
+        <span class="mobile-day-count">${daySchedules.length + dayExams.length}件</span>
+      </div>`;
+
+    // 考査
+    dayExams.forEach((e) => {
+      const matchedSubj = subjects.find((s) => s.name === e.subject);
+      const color = matchedSubj ? matchedSubj.color : "var(--purple)";
+      html += `<div class="mobile-schedule-item mobile-exam-item" style="border-left-color:${color}">
+        <div class="msi-time">${e.startTime || ""}${e.endTime ? "〜" + e.endTime : ""}</div>
+        <div class="msi-body">
+          <span class="msi-subject" style="color:${color}">📝 ${e.subject}</span>
+          ${e.note ? `<div class="msi-content">${e.note}</div>` : ""}
+        </div>
+        <span class="badge badge-exam" style="flex-shrink:0">考査</span>
+      </div>`;
+    });
+
+    if (!daySchedules.length && !dayExams.length) {
+      html += '<div class="mobile-day-empty">予定なし</div>';
+    } else {
+      daySchedules.forEach((s) => {
         const subj = subjectById(s.subjectId);
         const t = new Date(s.datetime);
-        html += `<div class="mobile-schedule-item" style="background:${subj.color}">
-        ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")} ${subj.name}<br>${s.content || ""}
-      </div>`;
+        const startStr = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+        const endMin =
+          t.getHours() * 60 +
+          t.getMinutes() +
+          Math.round((parseFloat(s.duration) || 1) * 60);
+        const endStr = `${String(Math.floor(endMin / 60) % 24).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
+        const statusClass =
+          s.status === "done"
+            ? "done"
+            : s.status === "miss"
+              ? "miss"
+              : s.status === "partial"
+                ? "partial"
+                : "";
+        html += `<div class="mobile-schedule-item${statusClass ? " msi-" + statusClass : ""}" style="border-left-color:${subj.color}">
+          <div class="msi-time">${startStr}<br><span class="msi-endtime">〜${endStr}</span></div>
+          <div class="msi-body">
+            <span class="msi-subject" style="color:${subj.color}">${subj.name}</span>
+            ${s.content ? `<div class="msi-content">${s.content}</div>` : ""}
+          </div>
+          <div class="msi-actions">
+            <button class="status-btn ${s.status === "done" ? "done" : ""}" onclick="setStatus('${s.id}','done')">✓</button>
+            <button class="status-btn ${s.status === "miss" ? "miss" : ""}" onclick="setStatus('${s.id}','miss')">✗</button>
+          </div>
+        </div>`;
       });
+    }
     html += "</div>";
   }
   container.innerHTML = html;
@@ -499,16 +682,13 @@ function renderExams() {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const sorted = [...exams].sort((a, b) => new Date(a.date) - new Date(b.date));
-  document.getElementById("exam-grid").innerHTML = sorted.length
+  const html = sorted.length
     ? sorted
         .map((e) => {
           const days = daysUntil(e.date);
           const cls = days !== null ? countdownClass(days) : "";
-
-          // 教科名から色を検索
           const matchedSubj = subjects.find((s) => s.name === e.subject);
           const bgColor = matchedSubj ? matchedSubj.color : "var(--purple)";
-
           return `<div class="exam-card" onclick="editExam('${e.id}')">
       <div class="exam-date">${fmtDate(e.date)}</div>
       <div class="exam-subj"><span class="badge" style="margin-bottom:4px; background:${bgColor}15; color:${bgColor}; border:1px solid ${bgColor}40;">${e.subject}</span></div>
@@ -520,32 +700,36 @@ function renderExams() {
         })
         .join("")
     : `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">📝</div><p>考査が登録されていません</p></div>`;
+  const g1 = document.getElementById("exam-grid");
+  if (g1) g1.innerHTML = html;
+  const g2 = document.getElementById("exam-grid-settings");
+  if (g2) g2.innerHTML = html;
 }
 
 // ── Subjects (with drag reorder) ──────────────────────
 let dragSrcIdx = null;
 
 function renderSubjects() {
-  const tbody = document.getElementById("subjects-table");
-  tbody.innerHTML = subjects.length
-    ? subjects
-        .map((s, i) => {
-          const planned = schedules
-            .filter((sc) => sc.subjectId === s.id)
-            .reduce((a, b) => a + (parseFloat(b.duration) || 0), 0);
-          const actual = schedules
-            .filter((sc) => sc.subjectId === s.id && sc.status === "done")
-            .reduce(
-              (a, b) =>
-                a +
-                (parseFloat(
-                  b.actualDuration !== undefined && b.actualDuration !== ""
-                    ? b.actualDuration
-                    : b.duration,
-                ) || 0),
-              0,
-            );
-          return `<tr draggable="true" data-idx="${i}" ondragstart="onDragStart(event,${i})" ondragover="onDragOver(event,${i})" ondrop="onDrop(event,${i})" ondragleave="onDragLeave(event)" ondragend="onDragEnd(event)">
+  function buildRows() {
+    return subjects.length
+      ? subjects
+          .map((s, i) => {
+            const planned = schedules
+              .filter((sc) => sc.subjectId === s.id)
+              .reduce((a, b) => a + (parseFloat(b.duration) || 0), 0);
+            const actual = schedules
+              .filter((sc) => sc.subjectId === s.id && sc.status === "done")
+              .reduce(
+                (a, b) =>
+                  a +
+                  (parseFloat(
+                    b.actualDuration !== undefined && b.actualDuration !== ""
+                      ? b.actualDuration
+                      : b.duration,
+                  ) || 0),
+                0,
+              );
+            return `<tr draggable="true" data-idx="${i}" ondragstart="onDragStart(event,${i})" ondragover="onDragOver(event,${i})" ondrop="onDrop(event,${i})" ondragleave="onDragLeave(event)" ondragend="onDragEnd(event)">
       <td data-label=""><span class="drag-handle" title="ドラッグで並び替え">⠿</span></td>
       <td data-label="カラー"><div style="width:20px;height:20px;border-radius:50%;background:${s.color};display:inline-block"></div></td>
       <td data-label="教科名"><strong>${s.name}</strong></td>
@@ -556,9 +740,15 @@ function renderSubjects() {
         <button class="btn btn-sm btn-danger" onclick="deleteSubject('${s.id}')">削除</button>
       </td>
     </tr>`;
-        })
-        .join("")
-    : `<tr class="empty-row"><td colspan="6" class="empty-cell"><div class="empty"><p>教科がありません</p></div></td></tr>`;
+          })
+          .join("")
+      : `<tr class="empty-row"><td colspan="6" class="empty-cell"><div class="empty"><p>教科がありません</p></div></td></tr>`;
+  }
+  const rows = buildRows();
+  const t1 = document.getElementById("subjects-table");
+  if (t1) t1.innerHTML = rows;
+  const t2 = document.getElementById("subjects-table-settings");
+  if (t2) t2.innerHTML = rows;
 }
 
 function onDragStart(e, idx) {
