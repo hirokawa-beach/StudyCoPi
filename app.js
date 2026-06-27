@@ -34,6 +34,7 @@ let schedules = load("sl_schedules", []);
 let exams = load("sl_exams", []);
 let weekOffset = 0;
 let hoursMode = "actual"; // 'actual' | 'planned' | 'both'
+let showExamsInSchedule = true;
 
 // ── Utilities ─────────────────────────────────────────
 function uid() {
@@ -290,6 +291,15 @@ function populateSubjectFilter() {
       .join("");
 }
 
+function toggleExamVisibility() {
+  showExamsInSchedule = !showExamsInSchedule;
+  const btn = document.getElementById("toggle-exam-btn");
+  if (btn) {
+    btn.textContent = showExamsInSchedule ? "考査を非表示" : "考査を表示";
+  }
+  renderSchedule();
+}
+
 function renderSchedule() {
   const sf = document.getElementById("filter-subject").value;
   const stf = document.getElementById("filter-status").value;
@@ -313,9 +323,11 @@ function renderSchedule() {
   });
 
   // スケジュールと考査を結合してソート
-  let list = [...schedules, ...examItems].sort(
-    (a, b) => new Date(b.datetime) - new Date(a.datetime),
-  );
+  let list = [...schedules];
+  if (showExamsInSchedule) {
+    list = [...list, ...examItems];
+  }
+  list.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
 
   if (sf)
     list = list.filter(

@@ -76,9 +76,10 @@
     <!-- Schedule list -->
     <div class="view" id="view-schedule">
       <div class="view-title">スケジュール一覧</div>
-      <div class="view-subtitle">登録した勉強予定と実績</div>
+      <div class="view-subtitle">登録した予定と実績</div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="openModal('schedule')">＋ 追加</button>
+        <button class="btn" id="toggle-exam-btn" onclick="toggleExamVisibility()">考査を非表示</button>
         <select id="filter-subject" onchange="renderSchedule()" style="width:auto">
           <option value="">すべての教科</option>
         </select>
