@@ -4,7 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>StudyCoPi — 勉強スケジュール管理</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4caf50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="StudyCoPi">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
 <link rel="stylesheet" href="styles.css">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js')
+        .catch((e) => console.warn('SW registration failed:', e));
+    });
+  }
+</script>
 </head>
 <body>
 <div class="mobile-header">
@@ -54,6 +71,9 @@
       <div class="nav-item" onclick="showView('settings')" id="nav-settings">
         <span class="nav-icon">⚙️</span> 設定
       </div>
+      <div class="nav-item" onclick="showView('help')" id="nav-help">
+        <span class="nav-icon">❓</span> ヘルプ
+      </div>
     </nav>
   </aside>
 
@@ -70,12 +90,14 @@
         <span class="section-title">直近のスケジュール</span>
         <button class="btn btn-sm" onclick="showView('schedule')">すべて見る →</button>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap dash-table-wrap">
         <table class="card-table">
           <thead><tr><th>日時</th><th>教科</th><th>内容</th><th>予定</th><th>実績</th><th>状況</th><th>記録</th></tr></thead>
           <tbody id="dash-table"></tbody>
         </table>
       </div>
+      <!-- モバイル専用カード表示 -->
+      <div class="schedule-mobile-list" id="dash-mobile-list"></div>
     </div>
 
     <!-- Schedule list -->
@@ -115,6 +137,16 @@
         <span class="week-label" id="week-label"></span>
         <button class="btn btn-sm" onclick="changeWeek(1)">次週 →</button>
         <button class="btn btn-sm" onclick="goToday()">今週</button>
+        <!-- スマホ専用 スライドスイッチ -->
+        <div class="tt-slide-switch mobile-only" id="tt-slide-switch">
+          <div class="tt-switch-track" onclick="setTTMode(ttMode === 'list' ? 'grid' : 'list')">
+            <div class="tt-switch-labels">
+              <span class="tt-switch-label" id="tt-label-list">📋 リスト</span>
+              <span class="tt-switch-label" id="tt-label-grid">🗓 時間割</span>
+            </div>
+            <div class="tt-switch-thumb" id="tt-switch-thumb"></div>
+          </div>
+        </div>
       </div>
       <div id="timetable-grid"></div>
       <div class="mobile-day-list" id="mobile-day-list"></div>
@@ -237,7 +269,7 @@
           <div class="focus-fs-timer" id="focus-fs-timer">00:00</div>
           <div class="focus-fs-elapsed" id="focus-fs-elapsed"></div>
           <div style="display:flex;gap:12px;margin-top:32px">
-            <button class="btn" style="flex:1;justify-content:center;padding:12px" onclick="pauseFocus()">⏸ 一時停止</button>
+            <button class="btn" id="focus-fs-pause-btn" style="flex:1;justify-content:center;padding:12px" onclick="pauseFocus()">⏸ 一時停止</button>
             <button class="btn btn-danger" style="flex:1;justify-content:center;padding:12px" onclick="stopFocus()">⏹ 終了</button>
           </div>
           <p style="margin-top:20px;font-size:12px;opacity:0.5">画面外をタップすると通常表示に戻ります</p>
@@ -284,7 +316,71 @@
 
       <hr style="margin: 24px 0;">
 
-      <!-- 考査予定セクション -->
+      <!-- 通知設定セクション -->
+      <div class="settings-section">
+        <div class="section-title" style="margin-bottom:12px">🔔 通知設定</div>
+        <div class="view-subtitle">スケジュール・考査の通知を管理</div>
+
+        <div class="notif-permission-row" id="notif-permission-row">
+          <span id="notif-status-text">通知の許可状態を確認中...</span>
+          <button class="btn btn-primary" id="notif-request-btn" onclick="requestNotifPermission()" style="display:none">通知を許可する</button>
+        </div>
+
+        <div class="notif-settings-grid" id="notif-settings-grid">
+          <label class="notif-toggle-row">
+            <div class="notif-toggle-info">
+              <span class="notif-toggle-title">⏰ タイマー終了</span>
+              <span class="notif-toggle-desc">集中タイマーが0:00になったとき</span>
+            </div>
+            <input type="checkbox" id="notif-timer" class="notif-check" onchange="saveNotifSettings()">
+          </label>
+
+          <label class="notif-toggle-row">
+            <div class="notif-toggle-info">
+              <span class="notif-toggle-title">📅 予定開始</span>
+              <span class="notif-toggle-desc">スケジュールの開始時刻になったとき</span>
+            </div>
+            <input type="checkbox" id="notif-schedule-start" class="notif-check" onchange="saveNotifSettings()">
+          </label>
+
+          <label class="notif-toggle-row">
+            <div class="notif-toggle-info">
+              <span class="notif-toggle-title">⏱ 予定のX分前</span>
+              <span class="notif-toggle-desc">スケジュール開始の前にリマインド</span>
+            </div>
+            <input type="checkbox" id="notif-schedule-pre" class="notif-check" onchange="saveNotifSettings()">
+          </label>
+          <div class="notif-sub-option" id="notif-pre-min-wrap">
+            <label style="font-size:13px;color:var(--text2)">何分前に通知</label>
+            <input type="number" id="notif-pre-min" value="10" min="1" max="60" step="1" style="width:64px" onchange="saveNotifSettings()">
+            <span style="font-size:13px;color:var(--text2)">分前</span>
+          </div>
+
+          <label class="notif-toggle-row">
+            <div class="notif-toggle-info">
+              <span class="notif-toggle-title">📝 考査前日通知</span>
+              <span class="notif-toggle-desc">考査の前日にリマインド</span>
+            </div>
+            <input type="checkbox" id="notif-exam-prev" class="notif-check" onchange="saveNotifSettings()">
+          </label>
+          <div class="notif-sub-option" id="notif-exam-prev-time-wrap">
+            <label style="font-size:13px;color:var(--text2)">通知時刻</label>
+            <input type="time" id="notif-exam-prev-time" value="20:00" style="width:100px" onchange="saveNotifSettings()">
+          </div>
+
+          <label class="notif-toggle-row">
+            <div class="notif-toggle-info">
+              <span class="notif-toggle-title">📝 考査当日通知</span>
+              <span class="notif-toggle-desc">考査当日にリマインド</span>
+            </div>
+            <input type="checkbox" id="notif-exam-day" class="notif-check" onchange="saveNotifSettings()">
+          </label>
+          <div class="notif-sub-option" id="notif-exam-day-time-wrap">
+            <label style="font-size:13px;color:var(--text2)">通知時刻</label>
+            <input type="time" id="notif-exam-day-time" value="07:00" style="width:100px" onchange="saveNotifSettings()">
+          </div>
+        </div>
+      </div>
       <div class="settings-section">
         <div class="section-title" style="margin-bottom:12px">📝 考査予定管理</div>
         <div class="view-subtitle">テスト・考査の目標スケジュール</div>
@@ -292,6 +388,234 @@
           <button class="btn btn-primary" onclick="openModal('exam')">＋ 考査を追加</button>
         </div>
         <div class="exam-grid" id="exam-grid-settings"></div>
+      </div>
+
+    </div>
+
+    <!-- Help -->
+    <div class="view" id="view-help">
+      <div class="view-title">❓ ヘルプ</div>
+      <div class="view-subtitle">StudyCoPi の使い方と機能ガイド</div>
+
+      <!-- タブ -->
+      <div class="help-tabs">
+        <button class="help-tab active" data-tab="features" onclick="switchHelpTab('features')">機能一覧</button>
+        <button class="help-tab" data-tab="howto"    onclick="switchHelpTab('howto')">使い方</button>
+        <button class="help-tab" data-tab="pwa"      onclick="switchHelpTab('pwa')">アプリ化</button>
+        <button class="help-tab" data-tab="faq"      onclick="switchHelpTab('faq')">FAQ</button>
+      </div>
+
+      <!-- 機能一覧 -->
+      <div class="help-panel active" id="help-features">
+        <div class="help-feature-grid">
+
+          <div class="help-feature-card">
+            <div class="help-feature-icon">🏠</div>
+            <div class="help-feature-body">
+              <div class="help-feature-title">ダッシュボード</div>
+              <div class="help-feature-desc">今週の学習状況をひと目で確認。直近の予定・考査カウントダウン・教科別の進捗バーを表示します。</div>
+            </div>
+          </div>
+
+          <div class="help-feature-card">
+            <div class="help-feature-icon">📅</div>
+            <div class="help-feature-body">
+              <div class="help-feature-title">スケジュール一覧</div>
+              <div class="help-feature-desc">登録した勉強予定を一覧表示。教科・期間・状況でフィルタリングでき、実績時間の記録や完了チェックも行えます。</div>
+              <div class="help-feature-tags"><span class="help-tag">フィルター</span><span class="help-tag">実績入力</span><span class="help-tag">スマホ対応カード</span></div>
+            </div>
+          </div>
+
+          <div class="help-feature-card">
+            <div class="help-feature-icon">📋</div>
+            <div class="help-feature-body">
+              <div class="help-feature-title">週間タイムテーブル</div>
+              <div class="help-feature-desc">1週間の予定を時間軸ブロックで表示。開始〜終了時刻を四角で可視化し、考査も合わせて確認できます。スマホではリスト表示と切り替え可能。</div>
+              <div class="help-feature-tags"><span class="help-tag">ブロック表示</span><span class="help-tag">スライド切替</span></div>
+            </div>
+          </div>
+
+          <div class="help-feature-card">
+            <div class="help-feature-icon">📊</div>
+            <div class="help-feature-body">
+              <div class="help-feature-title">統計</div>
+              <div class="help-feature-desc">教科ごとの予定・実績時間を棒グラフで比較。期間を選んで週・月・全期間での学習量を振り返れます。</div>
+              <div class="help-feature-tags"><span class="help-tag">棒グラフ</span><span class="help-tag">期間フィルター</span></div>
+            </div>
+          </div>
+
+          <div class="help-feature-card">
+            <div class="help-feature-icon">🎯</div>
+            <div class="help-feature-body">
+              <div class="help-feature-title">集中モード</div>
+              <div class="help-feature-desc">タイマーを設定して集中学習。終了時に通知が届き、実績時間をスケジュールに自動記録します。フルスクリーン表示にも対応。</div>
+              <div class="help-feature-tags"><span class="help-tag">タイマー</span><span class="help-tag">自動記録</span><span class="help-tag">フルスクリーン</span></div>
+            </div>
+          </div>
+
+          <div class="help-feature-card">
+            <div class="help-feature-icon">🔔</div>
+            <div class="help-feature-body">
+              <div class="help-feature-title">通知機能</div>
+              <div class="help-feature-desc">タイマー終了・予定開始・X分前リマインダー・考査前日夜&当日朝の通知に対応。設定画面でオン/オフを個別に管理できます。</div>
+              <div class="help-feature-tags"><span class="help-tag">PWA通知</span><span class="help-tag">カスタム分数</span></div>
+            </div>
+          </div>
+
+          <div class="help-feature-card">
+            <div class="help-feature-icon">⚙️</div>
+            <div class="help-feature-body">
+              <div class="help-feature-title">設定</div>
+              <div class="help-feature-desc">教科のカラー登録・並び替え、考査予定の管理、通知設定をまとめて行えます。</div>
+              <div class="help-feature-tags"><span class="help-tag">教科管理</span><span class="help-tag">考査管理</span><span class="help-tag">通知設定</span></div>
+            </div>
+          </div>
+
+          <div class="help-feature-card">
+            <div class="help-feature-icon">💾</div>
+            <div class="help-feature-body">
+              <div class="help-feature-title">データ保存・復元</div>
+              <div class="help-feature-desc">全データをJSONファイルにエクスポート。機種変更やブラウザ変更時にインポートして引き継げます。</div>
+              <div class="help-feature-tags"><span class="help-tag">エクスポート</span><span class="help-tag">インポート</span></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- スクリーンショット置き場 -->
+        <div class="help-section-title">📸 スクリーンショット</div>
+        <div class="help-screenshots" id="help-screenshots">
+          <div class="help-screenshot-placeholder">
+            <span>📱</span>
+            <p>スクリーンショットは後で追加予定</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 使い方ステップ -->
+      <div class="help-panel" id="help-howto">
+        <div class="help-section-title">🚀 はじめて使う方へ</div>
+        <div class="help-steps">
+
+          <div class="help-step">
+            <div class="help-step-num">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">教科を登録する</div>
+              <div class="help-step-desc">設定 → 教科管理 から「＋ 教科を追加」で科目名とカラーを設定します。登録した教科はスケジュール作成時に選べるようになります。</div>
+            </div>
+          </div>
+
+          <div class="help-step">
+            <div class="help-step-num">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">考査予定を登録する（任意）</div>
+              <div class="help-step-desc">設定 → 考査予定管理 から考査日程を入力。ダッシュボードにカウントダウンが表示され、タイムテーブルにも反映されます。</div>
+            </div>
+          </div>
+
+          <div class="help-step">
+            <div class="help-step-num">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">勉強スケジュールを作る</div>
+              <div class="help-step-desc">スケジュール画面の「＋ 追加」から日時・教科・予定時間を入力。タイムテーブルに自動反映されます。</div>
+            </div>
+          </div>
+
+          <div class="help-step">
+            <div class="help-step-num">4</div>
+            <div class="help-step-body">
+              <div class="help-step-title">集中モードで勉強する</div>
+              <div class="help-step-desc">集中モードでタイマーをセットしてスタート。終了後に実績時間が自動で記録されます。手動で実績を入力することも可能です。</div>
+            </div>
+          </div>
+
+          <div class="help-step">
+            <div class="help-step-num">5</div>
+            <div class="help-step-body">
+              <div class="help-step-title">状況を記録して振り返る</div>
+              <div class="help-step-desc">スケジュール一覧で「完了 / 一部 / 未実施」を記録。統計画面で教科ごとの予定vs実績を確認できます。</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="help-section-title" style="margin-top:28px">💡 便利な使い方</div>
+        <div class="help-tips">
+          <div class="help-tip">📋 タイムテーブルはスマホで「🗓 時間割」に切り替えると、Googleカレンダー風のブロック表示になります</div>
+          <div class="help-tip">🔔 通知を許可しておくと、予定の10分前（変更可）に自動でリマインドされます</div>
+          <div class="help-tip">💾 定期的に「データ保存」からバックアップを取ることをおすすめします</div>
+          <div class="help-tip">🎯 集中モードでスケジュールと紐づけると、終了後に実績が自動入力されて便利です</div>
+        </div>
+      </div>
+
+      <!-- PWAインストール手順 -->
+      <div class="help-panel" id="help-pwa">
+        <div class="help-section-title">📲 スマホにアプリとして追加する</div>
+        <p style="margin-bottom:20px;color:var(--text2);font-size:14px">StudyCoPi はPWA（プログレッシブウェブアプリ）対応です。ホーム画面に追加するとネイティブアプリのように使えます。</p>
+
+        <div class="pwa-os-tabs">
+          <button class="pwa-os-btn active" onclick="switchPwaTab('ios')">🍎 iPhone / iPad</button>
+          <button class="pwa-os-btn" onclick="switchPwaTab('android')">🤖 Android</button>
+          <button class="pwa-os-btn" onclick="switchPwaTab('pc')">💻 PC（Chrome）</button>
+        </div>
+
+        <div class="pwa-steps" id="pwa-ios">
+          <div class="help-step"><div class="help-step-num">1</div><div class="help-step-body"><div class="help-step-title">Safari で開く</div><div class="help-step-desc">必ず Safari で StudyCoPi にアクセスしてください。Chrome や他のブラウザからはインストールできません。</div></div></div>
+          <div class="help-step"><div class="help-step-num">2</div><div class="help-step-body"><div class="help-step-title">共有ボタンをタップ</div><div class="help-step-desc">画面下部中央の「共有」ボタン（四角に矢印↑のアイコン）をタップします。</div></div></div>
+          <div class="help-step"><div class="help-step-num">3</div><div class="help-step-body"><div class="help-step-title">「ホーム画面に追加」を選ぶ</div><div class="help-step-desc">メニューをスクロールして「ホーム画面に追加」をタップ → 右上の「追加」を押せば完了です。</div></div></div>
+        </div>
+
+        <div class="pwa-steps" id="pwa-android" style="display:none">
+          <div class="help-step"><div class="help-step-num">1</div><div class="help-step-body"><div class="help-step-title">Chrome で開く</div><div class="help-step-desc">Android の Chrome ブラウザで StudyCoPi にアクセスします。</div></div></div>
+          <div class="help-step"><div class="help-step-num">2</div><div class="help-step-body"><div class="help-step-title">インストールバナーをタップ</div><div class="help-step-desc">アドレスバー右側にインストールアイコン（⊕）が表示されます。または右上メニュー（⋮）→「アプリをインストール」を選びます。</div></div></div>
+          <div class="help-step"><div class="help-step-num">3</div><div class="help-step-body"><div class="help-step-title">「インストール」を押して完了</div><div class="help-step-desc">確認ダイアログが出るので「インストール」をタップ。ホーム画面にアイコンが追加されます。</div></div></div>
+        </div>
+
+        <div class="pwa-steps" id="pwa-pc" style="display:none">
+          <div class="help-step"><div class="help-step-num">1</div><div class="help-step-body"><div class="help-step-title">Chrome で開く</div><div class="help-step-desc">Google Chrome で StudyCoPi にアクセスします（https:// 環境が必要です）。</div></div></div>
+          <div class="help-step"><div class="help-step-num">2</div><div class="help-step-body"><div class="help-step-title">アドレスバーのアイコンをクリック</div><div class="help-step-desc">アドレスバー右端に表示される「⊕」アイコンをクリックします。</div></div></div>
+          <div class="help-step"><div class="help-step-num">3</div><div class="help-step-body"><div class="help-step-title">「インストール」で完了</div><div class="help-step-desc">ダイアログの「インストール」をクリックするとデスクトップアプリとして追加されます。</div></div></div>
+        </div>
+
+        <div class="help-tip" style="margin-top:20px">💡 インストール後はオフラインでも閲覧できます（データはブラウザのローカルストレージに保存）</div>
+      </div>
+
+      <!-- FAQ -->
+      <div class="help-panel" id="help-faq">
+        <div class="help-section-title">よくある質問</div>
+        <div class="help-faq-list">
+
+          <details class="faq-item">
+            <summary class="faq-q">データはどこに保存されますか？</summary>
+            <div class="faq-a">ブラウザのローカルストレージに保存されます。サーバーには送信されないため、ブラウザのデータを削除すると消えてしまいます。定期的に「データ保存」からJSONファイルにバックアップしておくことをおすすめします。</div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-q">スマホとPCで同じデータを使いたい</summary>
+            <div class="faq-a">現在はデバイス間の自動同期には対応していません。PCで「データ保存」→ エクスポートしたJSONファイルをスマホで「バックアップから復元」することで手動で移行できます。</div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-q">通知が届きません</summary>
+            <div class="faq-a">以下を確認してください。①設定 → 通知設定で「通知を許可する」をタップして許可しているか。②ブラウザ・OSレベルで通知がブロックされていないか（iOSはSafari設定 → 通知）。③アプリ（ブラウザ）がバックグラウンドでも動作しているか。</div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-q">教科を削除したらスケジュールのデータは消えますか？</summary>
+            <div class="faq-a">スケジュールのデータ自体は残りますが、教科の色や名前が「不明」と表示される場合があります。教科を削除する前にスケジュールを整理しておくことをおすすめします。</div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-q">タイムテーブルに予定が表示されません</summary>
+            <div class="faq-a">タイムテーブルはその週の予定のみ表示します。「前週 / 次週」ボタンで表示週を切り替えてご確認ください。</div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-q">集中モードのタイマーを途中で止めたら記録は残りますか？</summary>
+            <div class="faq-a">「終了」ボタンを押した時点までの経過時間が実績として記録されます。ブラウザを閉じると記録されないのでご注意ください。</div>
+          </details>
+
+        </div>
       </div>
 
     </div>
@@ -314,7 +638,7 @@
   <button type="button" data-view="timetable" onclick="showView('timetable')">📋<br>週</button>
   <button type="button" data-view="focus" onclick="showView('focus')">🎯<br>集中</button>
   <button type="button" data-view="hours" onclick="showView('hours')">📊<br>統計</button>
-  <button type="button" data-view="settings" onclick="showView('settings')">⚙️<br>設定</button>
+  <button type="button" data-view="help" onclick="showView('help')">❓<br>ヘルプ</button>
 </div>
 
 </body>

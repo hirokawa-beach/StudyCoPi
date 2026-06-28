@@ -247,7 +247,49 @@ tr.drag-over td { background: var(--accent-bg) !important; }
 .dash-progress-bar-bg { background: var(--surface2); border-radius: 8px; height: 10px; overflow: hidden; }
 .dash-progress-bar-fill { height: 100%; background: var(--accent); border-radius: 8px; transition: width 0.5s ease; }
 
-/* ── Block-style Timetable ─────────────────────────── */
+/* ── Timetable view mode slide switch (mobile) ───────── */
+.tt-slide-switch { margin-left: auto; }
+.tt-switch-track {
+  position: relative;
+  display: flex;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  cursor: pointer;
+  user-select: none;
+  gap: 0;
+  min-width: 172px;
+}
+.tt-switch-labels {
+  display: flex;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+.tt-switch-label {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text2);
+  padding: 5px 8px;
+  transition: font-weight 0.15s, color 0.15s;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.tt-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  bottom: 3px;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+  z-index: 0;
+}
+
 .tt2-wrap { display: flex; gap: 0; overflow-x: auto; overflow-y: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface2); }
 .tt2-axis { flex-shrink: 0; width: 46px; background: var(--surface); border-right: 1px solid var(--border); }
 .tt2-axis-inner { position: relative; }
@@ -291,6 +333,61 @@ tr.drag-over td { background: var(--accent-bg) !important; }
 
 .settings-section { margin-bottom: 8px; }
 
+/* ── Timetable view toggle (mobile) ─────────────────── */
+.tt-view-toggle { display: none; }
+.mobile-only { display: none; }
+@media (max-width: 700px) {
+  .mobile-only { display: flex; }
+  .tt-view-toggle {
+    display: flex;
+    background: var(--surface2);
+    border-radius: 20px;
+    padding: 3px;
+    gap: 2px;
+    border: 1px solid var(--border);
+    margin-left: auto;
+  }
+  .tt-toggle-btn {
+    padding: 5px 14px;
+    border-radius: 16px;
+    border: none;
+    background: transparent;
+    color: var(--text2);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s;
+    white-space: nowrap;
+  }
+  .tt-toggle-btn.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+}
+
+.notif-permission-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 16px; flex-wrap: wrap; }
+
+/* 集中タイマー：再開ボタン */
+.btn-resuming {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent) !important;
+  animation: pulse-resume 1.4s ease-in-out infinite;
+}
+@keyframes pulse-resume {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.75; }
+}
+.notif-settings-grid { display: flex; flex-direction: column; gap: 4px; transition: opacity 0.2s; }
+.notif-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: var(--surface2); border-radius: var(--radius-sm); cursor: pointer; transition: background 0.15s; }
+.notif-toggle-row:hover { background: var(--surface3, var(--border)); }
+.notif-toggle-info { display: flex; flex-direction: column; gap: 3px; }
+.notif-toggle-title { font-size: 14px; font-weight: 600; }
+.notif-toggle-desc { font-size: 12px; color: var(--text3); }
+.notif-check { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+.notif-sub-option { display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 32px; background: var(--surface); border-radius: var(--radius-sm); margin-top: -2px; }
+
 /* ── Schedule mobile card list (hidden on desktop) ── */
 .schedule-mobile-list { display: none; }
 
@@ -330,6 +427,7 @@ tr.drag-over td { background: var(--accent-bg) !important; }
 
 @media (max-width: 700px) {
   .schedule-table-wrap { display: none; }
+  .dash-table-wrap { display: none; }
   .schedule-mobile-list { display: block; }
 }
 
@@ -452,10 +550,9 @@ tr.drag-over td { background: var(--accent-bg) !important; }
     }
     .card-table td[data-label="操作"] .btn { margin-top: 4px; }
 
-    /* Timetable → day list on mobile */
-    .tt2-wrap { display: none; }
-    .tt2-col { min-width: 52px; }
-    .tt2-col-header { font-size: 11px; }
+    /* Timetable → JS で表示切替 (applyTTMode) */
+    .tt2-col { min-width: 46px; }
+    .tt2-col-header { font-size: 10px; }
     .tt2-block-content { display: none; }
     .mobile-day-list { display: block; }
 
@@ -491,3 +588,202 @@ tr.drag-over td { background: var(--accent-bg) !important; }
     .hours-toggle-row { gap: 6px; }
     .exam-countdown-banner { flex-direction: column; gap: 6px; align-items: flex-start; }
   }
+
+/* ── Help ────────────────────────────────────────────── */
+
+/* タブ */
+.help-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0;
+  flex-wrap: wrap;
+}
+.help-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text3);
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.help-tab:hover { color: var(--text); }
+.help-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
+
+/* パネル */
+.help-panel { display: none; }
+.help-panel.active { display: block; }
+
+/* セクション見出し */
+.help-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 24px 0 14px;
+  padding-left: 10px;
+  border-left: 3px solid var(--accent);
+}
+.help-section-title:first-child { margin-top: 0; }
+
+/* 機能カードグリッド */
+.help-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.help-feature-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: border-color 0.15s;
+}
+.help-feature-card:hover { border-color: var(--accent-light); }
+.help-feature-icon { font-size: 28px; flex-shrink: 0; line-height: 1; margin-top: 2px; }
+.help-feature-body { flex: 1; min-width: 0; }
+.help-feature-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.help-feature-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.help-feature-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.help-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* スクリーンショット */
+.help-screenshots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.help-screenshot-placeholder {
+  aspect-ratio: 9/16;
+  max-height: 280px;
+  background: var(--surface2);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text3);
+  font-size: 36px;
+  gap: 10px;
+}
+.help-screenshot-placeholder p { font-size: 12px; text-align: center; padding: 0 12px; }
+
+/* 使い方ステップ */
+.help-steps { display: flex; flex-direction: column; gap: 12px; }
+.help-step {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.help-step-num {
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.help-step-body { flex: 1; }
+.help-step-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.help-step-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+/* ヒント */
+.help-tips { display: flex; flex-direction: column; gap: 8px; }
+.help-tip {
+  font-size: 13px;
+  color: var(--text2);
+  background: var(--surface2);
+  border-left: 3px solid var(--accent-light);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 14px;
+  line-height: 1.6;
+}
+
+/* PWA OS タブ */
+.pwa-os-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.pwa-os-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.pwa-os-btn:hover { border-color: var(--accent-light); color: var(--text); }
+.pwa-os-btn.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.pwa-steps { display: flex; flex-direction: column; gap: 10px; }
+
+/* FAQ */
+.help-faq-list { display: flex; flex-direction: column; gap: 8px; }
+.faq-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.faq-item[open] { border-color: var(--accent-light); }
+.faq-q {
+  padding: 16px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  user-select: none;
+}
+.faq-q::-webkit-details-marker { display: none; }
+.faq-q::after {
+  content: '＋';
+  font-size: 16px;
+  color: var(--accent);
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.faq-item[open] .faq-q::after { content: '－'; }
+.faq-a {
+  padding: 0 18px 16px;
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.7;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+@media (max-width: 700px) {
+  .help-feature-grid { grid-template-columns: 1fr; }
+  .help-tab { padding: 7px 12px; font-size: 13px; }
+}

@@ -149,6 +149,7 @@ function showView(name) {
   document.querySelectorAll(".mobile-bottom-nav button").forEach((b) => {
     b.classList.toggle("active", b.dataset.view === name);
   });
+  if (name === "settings") loadNotifSettingsUI();
   render();
 }
 
@@ -164,6 +165,47 @@ function render() {
   renderFocusSetup();
   populateSubjectFilter();
   populateHoursExamPresets();
+}
+
+// ── Shared: スケジュールカード HTML（モバイル用）────────
+function buildScheduleCard(s) {
+  const subj = subjectById(s.subjectId);
+  const t = new Date(s.datetime);
+  const timeStr = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+  const endMin =
+    t.getHours() * 60 +
+    t.getMinutes() +
+    Math.round((parseFloat(s.duration) || 1) * 60);
+  const endStr = `${String(Math.floor(endMin / 60) % 24).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
+  const actual =
+    s.actualDuration !== undefined && s.actualDuration !== ""
+      ? s.actualDuration
+      : "";
+  return `<div class="scm-card${s.status === "done" ? " scm-done" : s.status === "miss" ? " scm-miss" : ""}" style="border-left-color:${subj.color}">
+    <div class="scm-left">
+      <div class="scm-time">${timeStr}</div>
+      <div class="scm-endtime">〜${endStr}</div>
+      <div class="scm-dur">${s.duration || "-"}h</div>
+    </div>
+    <div class="scm-body">
+      <div class="scm-subject" style="color:${subj.color}">${subj.name}</div>
+      ${s.content ? `<div class="scm-content">${s.content}</div>` : ""}
+      ${s.note ? `<div class="scm-note">${s.note}</div>` : ""}
+      <div class="scm-actual-row">
+        <span style="font-size:11px;color:var(--text3)">実績</span>
+        <input type="number" class="scm-actual-input" value="${actual}" min="0" max="24" step="0.25"
+          onchange="saveActual('${s.id}',this.value)" placeholder="-">
+        <span style="font-size:11px;color:var(--text3)">h</span>
+      </div>
+    </div>
+    <div class="scm-right">
+      <div class="scm-status-btns">
+        <button class="scm-btn-status${s.status === "done" ? " scm-s-done" : ""}" onclick="setStatus('${s.id}','done')" title="完了">✓</button>
+        <button class="scm-btn-status${s.status === "partial" ? " scm-s-partial" : ""}" onclick="setStatus('${s.id}','partial')" title="一部">△</button>
+        <button class="scm-btn-status${s.status === "miss" ? " scm-s-miss" : ""}" onclick="setStatus('${s.id}','miss')" title="未実施">✗</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 // ── Dashboard ─────────────────────────────────────────
@@ -249,8 +291,12 @@ function renderDashboard() {
   }
 
   const recent = [...schedules]
-    .sort((a, b) => new Date(b.datetime) - new Date(a.datetime))
+    .filter(
+      (s) => new Date(s.datetime) >= new Date(new Date().setHours(0, 0, 0, 0)),
+    )
+    .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
     .slice(0, 8);
+
   document.getElementById("dash-table").innerHTML = recent.length
     ? recent
         .map((s) => {
@@ -275,6 +321,51 @@ function renderDashboard() {
         })
         .join("")
     : `<tr class="empty-row"><td colspan="7" class="empty-cell"><div class="empty"><div class="empty-icon">📚</div><p>スケジュールがありません。追加してみましょう！</p></div></td></tr>`;
+
+  // ── モバイル用カード表示 ──────────────────────────────
+  const dashMobile = document.getElementById("dash-mobile-list");
+  if (dashMobile) {
+    if (!recent.length) {
+      dashMobile.innerHTML = `<div class="empty"><div class="empty-icon">📚</div><p>スケジュールがありません</p></div>`;
+    } else {
+      const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      // 日付グループ化
+      const groups = {};
+      recent.forEach((s) => {
+        const d = new Date(s.datetime);
+        const key = d.toDateString();
+        if (!groups[key]) groups[key] = { date: d, items: [] };
+        groups[key].items.push(s);
+      });
+      dashMobile.innerHTML = Object.values(groups)
+        .map((g) => {
+          const gDate = new Date(g.date);
+          gDate.setHours(0, 0, 0, 0);
+          const diff = Math.round((gDate - today) / 86400000);
+          const dayLabel =
+            diff === 0
+              ? "今日"
+              : diff === 1
+                ? "明日"
+                : diff === -1
+                  ? "昨日"
+                  : "";
+          const dateStr = `${g.date.getMonth() + 1}/${g.date.getDate()}(${dayNames[g.date.getDay()]})`;
+          const isToday = diff === 0;
+          const itemsHtml = g.items.map((s) => buildScheduleCard(s)).join("");
+          return `<div class="scm-group${isToday ? " scm-group-today" : ""}">
+          <div class="scm-date-header">
+            <span class="scm-date-str">${dateStr}</span>
+            ${dayLabel ? `<span class="scm-day-label${isToday ? " scm-today-label" : ""}">${dayLabel}</span>` : ""}
+          </div>
+          ${itemsHtml}
+        </div>`;
+        })
+        .join("");
+    }
+  }
 }
 
 // ── Schedule filter ───────────────────────────────────
@@ -486,6 +577,41 @@ function renderSchedule() {
     .join("");
 }
 
+// ── Timetable mode toggle (mobile) ────────────────────
+let ttMode = "list"; // 'list' | 'grid'
+
+function setTTMode(mode) {
+  ttMode = mode;
+  applyTTMode();
+}
+
+function applyTTMode() {
+  const grid = document.getElementById("timetable-grid");
+  const list = document.getElementById("mobile-day-list");
+  const thumb = document.getElementById("tt-switch-thumb");
+  const lList = document.getElementById("tt-label-list");
+  const lGrid = document.getElementById("tt-label-grid");
+  if (!grid || !list) return;
+
+  const isMobile = window.innerWidth <= 700;
+  if (!isMobile) {
+    grid.style.display = "";
+    list.style.display = "none";
+    if (thumb) thumb.style.transform = "";
+  } else {
+    const isGrid = ttMode === "grid";
+    grid.style.display = isGrid ? "" : "none";
+    list.style.display = isGrid ? "none" : "";
+    // スライドスイッチの位置
+    if (thumb)
+      thumb.style.transform = isGrid
+        ? "translateX(calc(100% + 2px))"
+        : "translateX(0)";
+    if (lList) lList.style.fontWeight = isGrid ? "400" : "700";
+    if (lGrid) lGrid.style.fontWeight = isGrid ? "700" : "400";
+  }
+}
+
 // ── Timetable ─────────────────────────────────────────
 function renderTimetable() {
   const now = new Date();
@@ -498,15 +624,47 @@ function renderTimetable() {
     d.setDate(base.getDate() + i);
     return d;
   });
-  const START_HOUR = 6;
-  const END_HOUR = 23;
-  const TOTAL_HOURS = END_HOUR - START_HOUR;
-  const ROW_H = 52; // px per hour
-  const HEADER_H = 40; // px for day header
-  const GRID_H = TOTAL_HOURS * ROW_H;
 
   document.getElementById("week-label").textContent =
     `${dates[0].getMonth() + 1}/${dates[0].getDate()} 〜 ${dates[6].getMonth() + 1}/${dates[6].getDate()}`;
+
+  // ── 表示時間範囲：最低6〜22、予定が範囲外なら自動拡張 ─
+  let minHour = 6,
+    maxHour = 22;
+
+  schedules.forEach((s) => {
+    if (
+      !dates.some(
+        (d) => d.toDateString() === new Date(s.datetime).toDateString(),
+      )
+    )
+      return;
+    const t = new Date(s.datetime);
+    minHour = Math.min(minHour, t.getHours());
+    maxHour = Math.max(
+      maxHour,
+      Math.ceil(t.getHours() + (parseFloat(s.duration) || 1)),
+    );
+  });
+  exams.forEach((e) => {
+    if (
+      !dates.some(
+        (d) => d.toDateString() === new Date(e.date + "T00:00").toDateString(),
+      )
+    )
+      return;
+    if (e.startTime)
+      minHour = Math.min(minHour, parseInt(e.startTime.split(":")[0]));
+    if (e.endTime)
+      maxHour = Math.max(maxHour, Math.ceil(parseInt(e.endTime.split(":")[0])));
+  });
+
+  const START_HOUR = Math.max(0, minHour);
+  const END_HOUR = Math.min(24, maxHour);
+  const TOTAL_HOURS = END_HOUR - START_HOUR;
+  const ROW_H = 52;
+  const HEADER_H = 40;
+  const GRID_H = TOTAL_HOURS * ROW_H;
 
   function toY(datetimeStr) {
     const d = new Date(datetimeStr);
@@ -514,18 +672,17 @@ function renderTimetable() {
       ((d.getHours() * 60 + d.getMinutes() - START_HOUR * 60) / 60) * ROW_H
     );
   }
-  function durToH(durationVal) {
-    return (parseFloat(durationVal) || 1) * ROW_H;
+  function durToH(v) {
+    return (parseFloat(v) || 1) * ROW_H;
   }
 
-  // 時間軸 HTML（絶対位置で各 hour ラベルを配置）
+  // 時間軸ラベル
   let axisHtml = "";
   for (let h = START_HOUR; h <= END_HOUR; h++) {
-    const y = (h - START_HOUR) * ROW_H;
-    axisHtml += `<div class="tt2-tick" style="top:${y}px">${h}:00</div>`;
+    axisHtml += `<div class="tt2-tick" style="top:${(h - START_HOUR) * ROW_H}px">${h}:00</div>`;
   }
 
-  // 1時間ごとの横線 HTML
+  // 横線
   let linesHtml = "";
   for (let i = 0; i <= TOTAL_HOURS; i++) {
     linesHtml += `<div class="tt2-hour-line" style="top:${i * ROW_H}px"></div>`;
@@ -546,7 +703,6 @@ function renderTimetable() {
 
     let blocksHtml = linesHtml;
 
-    // 考査ブロック
     dayExams.forEach((e) => {
       const matchedSubj = subjects.find((s) => s.name === e.subject);
       const color = matchedSubj ? matchedSubj.color : "var(--purple)";
@@ -560,13 +716,12 @@ function renderTimetable() {
         : sMins + 60;
       const top = Math.max(0, ((sMins - START_HOUR * 60) / 60) * ROW_H);
       const height = Math.max(ROW_H * 0.4, ((eMins - sMins) / 60) * ROW_H);
-      blocksHtml += `<div class="tt2-block tt2-exam-block" style="top:${top}px;height:${height}px;border-color:${color};color:${color}" title="📝考査: ${e.subject}">
+      blocksHtml += `<div class="tt2-block tt2-exam-block" style="top:${top}px;height:${height}px;border-color:${color};color:${color}" title="📝${e.subject}">
         <span class="tt2-block-name">📝${e.subject}</span>
         <span class="tt2-block-time">${e.startTime || ""}${e.endTime ? "〜" + e.endTime : ""}</span>
       </div>`;
     });
 
-    // スケジュールブロック
     daySchedules.forEach((s) => {
       const subj = subjectById(s.subjectId);
       const top = Math.max(0, toY(s.datetime));
@@ -597,6 +752,7 @@ function renderTimetable() {
     </div>`;
 
   renderMobileDayList(base, now);
+  applyTTMode();
 }
 
 function renderMobileDayList(base, now) {
@@ -1008,18 +1164,29 @@ function tickFocus() {
 }
 
 function pauseFocus() {
+  const btn = document.getElementById("focus-pause-btn");
+  const btnFs = document.getElementById("focus-fs-pause-btn");
+
   if (focusPaused) {
-    // Resume
+    // 再開
     focusStart = Date.now();
     focusPaused = false;
-    document.getElementById("focus-pause-btn").textContent = "⏸ 一時停止";
     focusTimer = setInterval(tickFocus, 500);
+    [btn, btnFs].forEach((b) => {
+      if (!b) return;
+      b.textContent = "⏸ 一時停止";
+      b.classList.remove("btn-resuming");
+    });
   } else {
-    // Pause
+    // 一時停止
     focusElapsed += Math.floor((Date.now() - focusStart) / 1000);
     focusPaused = true;
     clearInterval(focusTimer);
-    document.getElementById("focus-pause-btn").textContent = "▶ 再開";
+    [btn, btnFs].forEach((b) => {
+      if (!b) return;
+      b.textContent = "▶ 再開";
+      b.classList.add("btn-resuming");
+    });
   }
 }
 
@@ -1033,6 +1200,8 @@ function stopFocus() {
 }
 
 function finishFocusAuto(elapsed) {
+  const subj = subjectById(focusSubjectId);
+  notifyTimerEnd(subj.name);
   setTimeout(() => {
     alert(`⏰ タイマー終了！ お疲れ様でした。`);
     recordFocusSession(elapsed);
@@ -1378,10 +1547,291 @@ function saveSubject(id) {
   render();
 }
 
+// ── Notifications ─────────────────────────────────────
+let notifSettings = load("sl_notif", {
+  timer: true,
+  scheduleStart: true,
+  schedulePre: true,
+  preMin: 10,
+  examPrev: true,
+  examPrevTime: "20:00",
+  examDay: true,
+  examDayTime: "07:00",
+});
+
+let _scheduleCheckTimer = null;
+let _examCheckTimer = null;
+let _firedNotifs = new Set(load("sl_notif_fired", []));
+
+function saveNotifSettings() {
+  notifSettings = {
+    timer:
+      document.getElementById("notif-timer")?.checked ?? notifSettings.timer,
+    scheduleStart:
+      document.getElementById("notif-schedule-start")?.checked ??
+      notifSettings.scheduleStart,
+    schedulePre:
+      document.getElementById("notif-schedule-pre")?.checked ??
+      notifSettings.schedulePre,
+    preMin:
+      parseInt(document.getElementById("notif-pre-min")?.value) ||
+      notifSettings.preMin,
+    examPrev:
+      document.getElementById("notif-exam-prev")?.checked ??
+      notifSettings.examPrev,
+    examPrevTime:
+      document.getElementById("notif-exam-prev-time")?.value ||
+      notifSettings.examPrevTime,
+    examDay:
+      document.getElementById("notif-exam-day")?.checked ??
+      notifSettings.examDay,
+    examDayTime:
+      document.getElementById("notif-exam-day-time")?.value ||
+      notifSettings.examDayTime,
+  };
+  save("sl_notif", notifSettings);
+  // サブ設定の表示切替
+  const wrap = document.getElementById("notif-pre-min-wrap");
+  if (wrap) wrap.style.display = notifSettings.schedulePre ? "flex" : "none";
+  const wrapPrev = document.getElementById("notif-exam-prev-time-wrap");
+  if (wrapPrev)
+    wrapPrev.style.display = notifSettings.examPrev ? "flex" : "none";
+  const wrapDay = document.getElementById("notif-exam-day-time-wrap");
+  if (wrapDay) wrapDay.style.display = notifSettings.examDay ? "flex" : "none";
+  restartNotifPolling();
+}
+
+function loadNotifSettingsUI() {
+  const map = {
+    "notif-timer": "timer",
+    "notif-schedule-start": "scheduleStart",
+    "notif-schedule-pre": "schedulePre",
+    "notif-exam-prev": "examPrev",
+    "notif-exam-day": "examDay",
+  };
+  Object.entries(map).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.checked = notifSettings[key];
+  });
+  const preMin = document.getElementById("notif-pre-min");
+  if (preMin) preMin.value = notifSettings.preMin;
+  const prevTime = document.getElementById("notif-exam-prev-time");
+  if (prevTime) prevTime.value = notifSettings.examPrevTime || "20:00";
+  const dayTime = document.getElementById("notif-exam-day-time");
+  if (dayTime) dayTime.value = notifSettings.examDayTime || "07:00";
+
+  const wrap = document.getElementById("notif-pre-min-wrap");
+  if (wrap) wrap.style.display = notifSettings.schedulePre ? "flex" : "none";
+  const wrapPrev = document.getElementById("notif-exam-prev-time-wrap");
+  if (wrapPrev)
+    wrapPrev.style.display = notifSettings.examPrev ? "flex" : "none";
+  const wrapDay = document.getElementById("notif-exam-day-time-wrap");
+  if (wrapDay) wrapDay.style.display = notifSettings.examDay ? "flex" : "none";
+  updateNotifPermissionUI();
+}
+
+function updateNotifPermissionUI() {
+  const statusEl = document.getElementById("notif-status-text");
+  const btnEl = document.getElementById("notif-request-btn");
+  const gridEl = document.getElementById("notif-settings-grid");
+  if (!statusEl) return;
+
+  const perm = Notification.permission;
+  if (perm === "granted") {
+    statusEl.textContent = "✅ 通知は許可されています";
+    statusEl.style.color = "var(--accent)";
+    if (btnEl) btnEl.style.display = "none";
+    if (gridEl) gridEl.style.opacity = "1";
+  } else if (perm === "denied") {
+    statusEl.textContent =
+      "❌ 通知がブロックされています。ブラウザの設定から許可してください。";
+    statusEl.style.color = "var(--danger)";
+    if (btnEl) btnEl.style.display = "none";
+    if (gridEl) gridEl.style.opacity = "0.4";
+  } else {
+    statusEl.textContent = "🔔 通知が許可されていません";
+    statusEl.style.color = "var(--warn)";
+    if (btnEl) btnEl.style.display = "inline-flex";
+    if (gridEl) gridEl.style.opacity = "0.6";
+  }
+}
+
+async function requestNotifPermission() {
+  const result = await Notification.requestPermission();
+  updateNotifPermissionUI();
+  if (result === "granted") restartNotifPolling();
+}
+
+function sendNotif(title, body, tag) {
+  if (Notification.permission !== "granted") return;
+  // タグで重複送信防止
+  if (tag && _firedNotifs.has(tag)) return;
+  if (tag) {
+    _firedNotifs.add(tag);
+    // fired セットは当日のみ保持（midnight にクリア）
+    save("sl_notif_fired", [..._firedNotifs]);
+  }
+  const n = new Notification(title, {
+    body,
+    icon: "./icons/icon-192.png",
+    badge: "./icons/icon-192.png",
+    tag: tag || undefined,
+  });
+  n.onclick = () => {
+    window.focus();
+    n.close();
+  };
+}
+
+// ─ タイマー終了通知（finishFocusAuto から呼ぶ）
+function notifyTimerEnd(subjectName) {
+  if (!notifSettings.timer) return;
+  sendNotif(
+    "⏰ タイマー終了！",
+    `${subjectName} の集中タイマーが終わりました。お疲れ様でした！`,
+    null,
+  );
+}
+
+// ─ スケジュール通知ポーリング（1分ごと）
+function pollScheduleNotifs() {
+  if (Notification.permission !== "granted") return;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+
+  schedules.forEach((s) => {
+    if (s.status === "done" || s.status === "miss") return;
+    const t = new Date(s.datetime);
+    // 今日のスケジュールのみ
+    if (t.toDateString() !== now.toDateString()) return;
+    const tMin = t.getHours() * 60 + t.getMinutes();
+    const subj = subjectById(s.subjectId);
+
+    // 予定開始通知（±1分の誤差を許容）
+    if (notifSettings.scheduleStart) {
+      const tag = `sched-start-${s.id}-${t.toDateString()}`;
+      if (Math.abs(tMin - nowMin) <= 1) {
+        sendNotif(
+          `📅 ${subj.name} の時間です`,
+          `${s.content || "勉強"} を始めましょう！（${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}〜）`,
+          tag,
+        );
+      }
+    }
+
+    // X分前リマインダー
+    if (notifSettings.schedulePre) {
+      const pre = notifSettings.preMin;
+      const tag = `sched-pre-${s.id}-${t.toDateString()}`;
+      if (Math.abs(tMin - pre - nowMin) <= 1) {
+        sendNotif(
+          `⏱ ${pre}分後に ${subj.name} があります`,
+          `${s.content || "勉強"} の準備をしましょう！`,
+          tag,
+        );
+      }
+    }
+  });
+}
+
+// ─ 考査通知ポーリング（1分ごと）
+function pollExamNotifs() {
+  if (Notification.permission !== "granted") return;
+  const now = new Date();
+  const hm = now.getHours() * 60 + now.getMinutes();
+
+  exams.forEach((e) => {
+    const examDate = new Date(e.date + "T00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((examDate - today) / 86400000);
+
+    // 前日：設定時刻
+    if (notifSettings.examPrev && diffDays === 1) {
+      const [ph, pm] = (notifSettings.examPrevTime || "20:00")
+        .split(":")
+        .map(Number);
+      const tag = `exam-prev-${e.id}-${e.date}`;
+      if (Math.abs(hm - (ph * 60 + pm)) <= 1) {
+        sendNotif(
+          `📝 明日は ${e.subject} の考査です`,
+          `${e.date} に考査があります。最終確認を忘れずに！`,
+          tag,
+        );
+      }
+    }
+
+    // 当日：設定時刻
+    if (notifSettings.examDay && diffDays === 0) {
+      const [dh, dm] = (notifSettings.examDayTime || "07:00")
+        .split(":")
+        .map(Number);
+      const tag = `exam-day-${e.id}-${e.date}`;
+      if (Math.abs(hm - (dh * 60 + dm)) <= 1) {
+        sendNotif(
+          `📝 今日は ${e.subject} の考査です`,
+          `${e.startTime ? e.startTime + " 開始" : ""}  頑張ってください！`,
+          tag,
+        );
+      }
+    }
+  });
+}
+
+function restartNotifPolling() {
+  clearInterval(_scheduleCheckTimer);
+  clearInterval(_examCheckTimer);
+  if (Notification.permission !== "granted") return;
+  pollScheduleNotifs();
+  pollExamNotifs();
+  _scheduleCheckTimer = setInterval(pollScheduleNotifs, 60 * 1000);
+  _examCheckTimer = setInterval(pollExamNotifs, 60 * 1000);
+}
+
+// 日付が変わったら fired セットをリセット
+function scheduleMidnightReset() {
+  const now = new Date();
+  const msToMidnight =
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) - now;
+  setTimeout(() => {
+    _firedNotifs.clear();
+    save("sl_notif_fired", []);
+    restartNotifPolling();
+    scheduleMidnightReset();
+  }, msToMidnight + 1000);
+}
+
+// ── Help ──────────────────────────────────────────────
+function switchHelpTab(tab) {
+  document
+    .querySelectorAll(".help-tab")
+    .forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  document
+    .querySelectorAll(".help-panel")
+    .forEach((p) => p.classList.toggle("active", p.id === "help-" + tab));
+}
+
+function switchPwaTab(os) {
+  document.querySelectorAll(".pwa-os-btn").forEach((b, i) => {
+    const ids = ["ios", "android", "pc"];
+    b.classList.toggle("active", ids[i] === os);
+  });
+  ["pwa-ios", "pwa-android", "pwa-pc"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = id === "pwa-" + os ? "" : "none";
+  });
+}
+
 // ── Init ──────────────────────────────────────────────
 showView("dashboard");
+loadNotifSettingsUI();
+restartNotifPolling();
+scheduleMidnightReset();
 
 window.addEventListener("resize", () => {
   const active = document.querySelector(".view.active");
-  if (active && active.id === "view-timetable") renderTimetable();
+  if (active && active.id === "view-timetable") {
+    renderTimetable();
+    applyTTMode();
+  }
 });
