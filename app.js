@@ -149,6 +149,7 @@ function showView(name) {
   document.querySelectorAll(".mobile-bottom-nav button").forEach((b) => {
     b.classList.toggle("active", b.dataset.view === name);
   });
+  if (name === "settings") loadNotifSettingsUI();
   render();
 }
 
@@ -1033,6 +1034,8 @@ function stopFocus() {
 }
 
 function finishFocusAuto(elapsed) {
+  const subj = subjectById(focusSubjectId);
+  notifyTimerEnd(subj.name);
   setTimeout(() => {
     alert(`⏰ タイマー終了！ お疲れ様でした。`);
     recordFocusSession(elapsed);
@@ -1378,8 +1381,236 @@ function saveSubject(id) {
   render();
 }
 
+// ── Notifications ─────────────────────────────────────
+let notifSettings = load("sl_notif", {
+  timer: true,
+  scheduleStart: true,
+  schedulePre: true,
+  preMin: 10,
+  examPrev: true,
+  examDay: true,
+});
+
+let _scheduleCheckTimer = null;
+let _examCheckTimer = null;
+let _firedNotifs = new Set(load("sl_notif_fired", []));
+
+function saveNotifSettings() {
+  notifSettings = {
+    timer:
+      document.getElementById("notif-timer")?.checked ?? notifSettings.timer,
+    scheduleStart:
+      document.getElementById("notif-schedule-start")?.checked ??
+      notifSettings.scheduleStart,
+    schedulePre:
+      document.getElementById("notif-schedule-pre")?.checked ??
+      notifSettings.schedulePre,
+    preMin:
+      parseInt(document.getElementById("notif-pre-min")?.value) ||
+      notifSettings.preMin,
+    examPrev:
+      document.getElementById("notif-exam-prev")?.checked ??
+      notifSettings.examPrev,
+    examDay:
+      document.getElementById("notif-exam-day")?.checked ??
+      notifSettings.examDay,
+  };
+  save("sl_notif", notifSettings);
+  // X分前のサブ設定の表示切替
+  const wrap = document.getElementById("notif-pre-min-wrap");
+  if (wrap) wrap.style.display = notifSettings.schedulePre ? "flex" : "none";
+  restartNotifPolling();
+}
+
+function loadNotifSettingsUI() {
+  const map = {
+    "notif-timer": "timer",
+    "notif-schedule-start": "scheduleStart",
+    "notif-schedule-pre": "schedulePre",
+    "notif-exam-prev": "examPrev",
+    "notif-exam-day": "examDay",
+  };
+  Object.entries(map).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.checked = notifSettings[key];
+  });
+  const preMin = document.getElementById("notif-pre-min");
+  if (preMin) preMin.value = notifSettings.preMin;
+  const wrap = document.getElementById("notif-pre-min-wrap");
+  if (wrap) wrap.style.display = notifSettings.schedulePre ? "flex" : "none";
+  updateNotifPermissionUI();
+}
+
+function updateNotifPermissionUI() {
+  const statusEl = document.getElementById("notif-status-text");
+  const btnEl = document.getElementById("notif-request-btn");
+  const gridEl = document.getElementById("notif-settings-grid");
+  if (!statusEl) return;
+
+  const perm = Notification.permission;
+  if (perm === "granted") {
+    statusEl.textContent = "✅ 通知は許可されています";
+    statusEl.style.color = "var(--accent)";
+    if (btnEl) btnEl.style.display = "none";
+    if (gridEl) gridEl.style.opacity = "1";
+  } else if (perm === "denied") {
+    statusEl.textContent =
+      "❌ 通知がブロックされています。ブラウザの設定から許可してください。";
+    statusEl.style.color = "var(--danger)";
+    if (btnEl) btnEl.style.display = "none";
+    if (gridEl) gridEl.style.opacity = "0.4";
+  } else {
+    statusEl.textContent = "🔔 通知が許可されていません";
+    statusEl.style.color = "var(--warn)";
+    if (btnEl) btnEl.style.display = "inline-flex";
+    if (gridEl) gridEl.style.opacity = "0.6";
+  }
+}
+
+async function requestNotifPermission() {
+  const result = await Notification.requestPermission();
+  updateNotifPermissionUI();
+  if (result === "granted") restartNotifPolling();
+}
+
+function sendNotif(title, body, tag) {
+  if (Notification.permission !== "granted") return;
+  // タグで重複送信防止
+  if (tag && _firedNotifs.has(tag)) return;
+  if (tag) {
+    _firedNotifs.add(tag);
+    // fired セットは当日のみ保持（midnight にクリア）
+    save("sl_notif_fired", [..._firedNotifs]);
+  }
+  const n = new Notification(title, {
+    body,
+    icon: "./icons/icon-192.png",
+    badge: "./icons/icon-192.png",
+    tag: tag || undefined,
+  });
+  n.onclick = () => {
+    window.focus();
+    n.close();
+  };
+}
+
+// ─ タイマー終了通知（finishFocusAuto から呼ぶ）
+function notifyTimerEnd(subjectName) {
+  if (!notifSettings.timer) return;
+  sendNotif(
+    "⏰ タイマー終了！",
+    `${subjectName} の集中タイマーが終わりました。お疲れ様でした！`,
+    null,
+  );
+}
+
+// ─ スケジュール通知ポーリング（1分ごと）
+function pollScheduleNotifs() {
+  if (Notification.permission !== "granted") return;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+
+  schedules.forEach((s) => {
+    if (s.status === "done" || s.status === "miss") return;
+    const t = new Date(s.datetime);
+    // 今日のスケジュールのみ
+    if (t.toDateString() !== now.toDateString()) return;
+    const tMin = t.getHours() * 60 + t.getMinutes();
+    const subj = subjectById(s.subjectId);
+
+    // 予定開始通知（±1分の誤差を許容）
+    if (notifSettings.scheduleStart) {
+      const tag = `sched-start-${s.id}-${t.toDateString()}`;
+      if (Math.abs(tMin - nowMin) <= 1) {
+        sendNotif(
+          `📅 ${subj.name} の時間です`,
+          `${s.content || "勉強"} を始めましょう！（${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}〜）`,
+          tag,
+        );
+      }
+    }
+
+    // X分前リマインダー
+    if (notifSettings.schedulePre) {
+      const pre = notifSettings.preMin;
+      const tag = `sched-pre-${s.id}-${t.toDateString()}`;
+      if (Math.abs(tMin - pre - nowMin) <= 1) {
+        sendNotif(
+          `⏱ ${pre}分後に ${subj.name} があります`,
+          `${s.content || "勉強"} の準備をしましょう！`,
+          tag,
+        );
+      }
+    }
+  });
+}
+
+// ─ 考査通知ポーリング（1分ごと）
+function pollExamNotifs() {
+  if (Notification.permission !== "granted") return;
+  const now = new Date();
+  const hm = now.getHours() * 60 + now.getMinutes();
+
+  exams.forEach((e) => {
+    const examDate = new Date(e.date + "T00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((examDate - today) / 86400000);
+
+    // 前日夜 20:00
+    if (notifSettings.examPrev && diffDays === 1) {
+      const tag = `exam-prev-${e.id}-${e.date}`;
+      if (Math.abs(hm - 20 * 60) <= 1) {
+        sendNotif(
+          `📝 明日は ${e.subject} の考査です`,
+          `${e.date} に考査があります。最終確認を忘れずに！`,
+          tag,
+        );
+      }
+    }
+
+    // 当日朝 7:00
+    if (notifSettings.examDay && diffDays === 0) {
+      const tag = `exam-day-${e.id}-${e.date}`;
+      if (Math.abs(hm - 7 * 60) <= 1) {
+        sendNotif(
+          `📝 今日は ${e.subject} の考査です`,
+          `${e.startTime ? e.startTime + " 開始" : ""}  頑張ってください！`,
+          tag,
+        );
+      }
+    }
+  });
+}
+
+function restartNotifPolling() {
+  clearInterval(_scheduleCheckTimer);
+  clearInterval(_examCheckTimer);
+  if (Notification.permission !== "granted") return;
+  pollScheduleNotifs();
+  pollExamNotifs();
+  _scheduleCheckTimer = setInterval(pollScheduleNotifs, 60 * 1000);
+  _examCheckTimer = setInterval(pollExamNotifs, 60 * 1000);
+}
+
+// 日付が変わったら fired セットをリセット
+function scheduleMidnightReset() {
+  const now = new Date();
+  const msToMidnight =
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) - now;
+  setTimeout(() => {
+    _firedNotifs.clear();
+    save("sl_notif_fired", []);
+    restartNotifPolling();
+    scheduleMidnightReset();
+  }, msToMidnight + 1000);
+}
+
 // ── Init ──────────────────────────────────────────────
 showView("dashboard");
+loadNotifSettingsUI();
+restartNotifPolling();
+scheduleMidnightReset();
 
 window.addEventListener("resize", () => {
   const active = document.querySelector(".view.active");

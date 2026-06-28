@@ -291,6 +291,17 @@ tr.drag-over td { background: var(--accent-bg) !important; }
 
 .settings-section { margin-bottom: 8px; }
 
+/* ── Notification settings ───────────────────────────── */
+.notif-permission-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 16px; flex-wrap: wrap; }
+.notif-settings-grid { display: flex; flex-direction: column; gap: 4px; transition: opacity 0.2s; }
+.notif-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: var(--surface2); border-radius: var(--radius-sm); cursor: pointer; transition: background 0.15s; }
+.notif-toggle-row:hover { background: var(--surface3, var(--border)); }
+.notif-toggle-info { display: flex; flex-direction: column; gap: 3px; }
+.notif-toggle-title { font-size: 14px; font-weight: 600; }
+.notif-toggle-desc { font-size: 12px; color: var(--text3); }
+.notif-check { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+.notif-sub-option { display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 32px; background: var(--surface); border-radius: var(--radius-sm); margin-top: -2px; }
+
 /* ── Schedule mobile card list (hidden on desktop) ── */
 .schedule-mobile-list { display: none; }
 

@@ -301,7 +301,63 @@
 
       <hr style="margin: 24px 0;">
 
-      <!-- 考査予定セクション -->
+      <!-- 通知設定セクション -->
+      <div class="settings-section">
+        <div class="section-title" style="margin-bottom:12px">🔔 通知設定</div>
+        <div class="view-subtitle">スケジュール・考査の通知を管理</div>
+
+        <div class="notif-permission-row" id="notif-permission-row">
+          <span id="notif-status-text">通知の許可状態を確認中...</span>
+          <button class="btn btn-primary" id="notif-request-btn" onclick="requestNotifPermission()" style="display:none">通知を許可する</button>
+        </div>
+
+        <div class="notif-settings-grid" id="notif-settings-grid">
+          <label class="notif-toggle-row">
+            <div class="notif-toggle-info">
+              <span class="notif-toggle-title">⏰ タイマー終了</span>
+              <span class="notif-toggle-desc">集中タイマーが0:00になったとき</span>
+            </div>
+            <input type="checkbox" id="notif-timer" class="notif-check" onchange="saveNotifSettings()">
+          </label>
+
+          <label class="notif-toggle-row">
+            <div class="notif-toggle-info">
+              <span class="notif-toggle-title">📅 予定開始</span>
+              <span class="notif-toggle-desc">スケジュールの開始時刻になったとき</span>
+            </div>
+            <input type="checkbox" id="notif-schedule-start" class="notif-check" onchange="saveNotifSettings()">
+          </label>
+
+          <label class="notif-toggle-row">
+            <div class="notif-toggle-info">
+              <span class="notif-toggle-title">⏱ 予定のX分前</span>
+              <span class="notif-toggle-desc">スケジュール開始の前にリマインド</span>
+            </div>
+            <input type="checkbox" id="notif-schedule-pre" class="notif-check" onchange="saveNotifSettings()">
+          </label>
+          <div class="notif-sub-option" id="notif-pre-min-wrap">
+            <label style="font-size:13px;color:var(--text2)">何分前に通知</label>
+            <input type="number" id="notif-pre-min" value="10" min="1" max="60" step="1" style="width:64px" onchange="saveNotifSettings()">
+            <span style="font-size:13px;color:var(--text2)">分前</span>
+          </div>
+
+          <label class="notif-toggle-row">
+            <div class="notif-toggle-info">
+              <span class="notif-toggle-title">📝 考査前日通知</span>
+              <span class="notif-toggle-desc">考査の前日夜（20:00）にリマインド</span>
+            </div>
+            <input type="checkbox" id="notif-exam-prev" class="notif-check" onchange="saveNotifSettings()">
+          </label>
+
+          <label class="notif-toggle-row">
+            <div class="notif-toggle-info">
+              <span class="notif-toggle-title">📝 考査当日朝通知</span>
+              <span class="notif-toggle-desc">考査当日の朝（7:00）にリマインド</span>
+            </div>
+            <input type="checkbox" id="notif-exam-day" class="notif-check" onchange="saveNotifSettings()">
+          </label>
+        </div>
+      </div>
       <div class="settings-section">
         <div class="section-title" style="margin-bottom:12px">📝 考査予定管理</div>
         <div class="view-subtitle">テスト・考査の目標スケジュール</div>
