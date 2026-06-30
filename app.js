@@ -1671,16 +1671,43 @@ function sendNotif(title, body, tag) {
     // fired セットは当日のみ保持（midnight にクリア）
     save("sl_notif_fired", [..._firedNotifs]);
   }
-  const n = new Notification(title, {
+
+  // アイコンは絶対URLで指定（Android Chrome が相対パスを正しく解決しない場合があるため）
+  const iconUrl = new URL("icons/icon-192.png", window.location.href).href;
+  const badgeUrl = new URL("icons/icon-192.png", window.location.href).href;
+
+  const options = {
     body,
-    icon: "./icons/icon-192.png",
-    badge: "./icons/icon-192.png",
+    icon: iconUrl,
+    badge: badgeUrl,
     tag: tag || undefined,
-  });
-  n.onclick = () => {
-    window.focus();
-    n.close();
+    requireInteraction: false,
+    data: { url: window.location.href },
   };
+
+  // Service Worker 経由（Android Chrome 推奨ルート：アプリ名・アイコンが正しく表示される）
+  const reg =
+    window.swRegistration ||
+    (navigator.serviceWorker && navigator.serviceWorker.controller && null);
+  if (window.swRegistration) {
+    window.swRegistration.showNotification(title, options).catch((err) => {
+      console.warn("showNotification failed, falling back:", err);
+      try {
+        new Notification(title, options);
+      } catch (e) {}
+    });
+  } else {
+    // SW未登録時のフォールバック（iOSフォアグラウンド等）
+    try {
+      const n = new Notification(title, options);
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+    } catch (e) {
+      console.warn("Notification failed:", e);
+    }
+  }
 }
 
 // ─ タイマー終了通知（finishFocusAuto から呼ぶ）
