@@ -15,9 +15,11 @@
 
 <link rel="stylesheet" href="styles.css">
 <script>
+  window.swRegistration = null;
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./service-worker.js')
+        .then((reg) => { window.swRegistration = reg; })
         .catch((e) => console.warn('SW registration failed:', e));
     });
   }
@@ -578,6 +580,7 @@
         </div>
 
         <div class="help-tip" style="margin-top:20px">💡 インストール後はオフラインでも閲覧できます（データはブラウザのローカルストレージに保存）</div>
+        <div class="help-tip">⚠️ iPhoneでは、通知はアプリ（タブ）を開いている間のみ届きます。これは静的サイトの制約によるものです。</div>
       </div>
 
       <!-- FAQ -->
@@ -597,7 +600,11 @@
 
           <details class="faq-item">
             <summary class="faq-q">通知が届きません</summary>
-            <div class="faq-a">以下を確認してください。①設定 → 通知設定で「通知を許可する」をタップして許可しているか。②ブラウザ・OSレベルで通知がブロックされていないか（iOSはSafari設定 → 通知）。③アプリ（ブラウザ）がバックグラウンドでも動作しているか。</div>
+            <div class="faq-a">
+              以下を確認してください。①設定 → 通知設定で「通知を許可する」をタップして許可しているか。②ブラウザ・OSレベルで通知がブロックされていないか（iOSはSafari設定 → 通知）。<br><br>
+              <!-- <strong>iPhoneをお使いの方へ：</strong> iOSの仕様上、StudyCoPiの通知は<strong>アプリ（タブ）を開いている間のみ</strong>届きます。アプリを閉じている・バックグラウンドにある状態では通知できません。これはブラウザ／PWAの制約によるもので、現状回避できません。<br><br> -->
+              <strong>Androidをお使いの方へ：</strong> アプリを閉じていても通知が届きます。万一通知元が正しく表示されない場合は、ブラウザを最新版に更新し、サイト設定で通知が「許可」になっているかご確認ください。
+            </div>
           </details>
 
           <details class="faq-item">
@@ -638,6 +645,7 @@
   <button type="button" data-view="timetable" onclick="showView('timetable')">📋<br>週</button>
   <button type="button" data-view="focus" onclick="showView('focus')">🎯<br>集中</button>
   <button type="button" data-view="hours" onclick="showView('hours')">📊<br>統計</button>
+  <button type="button" data-view="settings" onclick="showView('settings')">⚙️<br>設定</button>
   <button type="button" data-view="help" onclick="showView('help')">❓<br>ヘルプ</button>
 </div>
 

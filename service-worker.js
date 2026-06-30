@@ -1,4 +1,4 @@
-const CACHE_NAME = "studycopi-v1";
+const CACHE_NAME = "studycopi-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -46,5 +46,23 @@ self.addEventListener("fetch", (e) => {
         return res;
       });
     }),
+  );
+});
+
+// 通知タップ時：既に開いているタブがあればフォーカス、なければ新規で開く
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const targetUrl =
+    (e.notification.data && e.notification.data.url) || "./index.html";
+
+  e.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if ("focus" in client) return client.focus();
+        }
+        if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+      }),
   );
 });
