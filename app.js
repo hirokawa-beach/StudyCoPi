@@ -1219,13 +1219,13 @@ function recordFocusSession(elapsedSec) {
       save("sl_schedules", schedules);
     }
   } else {
-    // Create new schedule entry
-    const now = new Date();
-    now.setSeconds(0, 0);
+    // Create new schedule entry — datetime は開始時刻（focusStart）を使う
+    const startTime = new Date(focusStart);
+    startTime.setSeconds(0, 0);
     schedules.push({
       id: uid(),
       subjectId: focusSubjectId,
-      datetime: now.toISOString(),
+      datetime: startTime.toISOString(),
       duration: hrs,
       actualDuration: hrs,
       content: "集中モードで記録",
