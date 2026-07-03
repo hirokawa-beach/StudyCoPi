@@ -426,30 +426,48 @@ function renderSchedule() {
     );
   if (stf) list = list.filter((s) => (s.status || "pending") === stf);
 
-  document.getElementById("schedule-table").innerHTML = list.length
-    ? list
-        .map((s) => {
-          if (s.isExam) {
-            // 考査用の行
-            return `<tr style="background: var(--surface2);">
-              <td data-label="日時">${fmt(s.datetime)}</td>
-              <td data-label="教科"><span class="subject-dot" style="background:${s.color}"></span><strong>${s.subjectName}</strong></td>
-              <td data-label="内容"><strong>${s.content}</strong></td>
-              <td data-label="予定時間">-</td>
-              <td data-label="実績時間">-</td>
-              <td data-label="状況"><span class="badge badge-exam">考査予定</span></td>
-              <td data-label="メモ" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.note}</td>
-              <td data-label="操作"><button class="btn btn-sm" onclick="editExam('${s.id}')">編集</button></td>
-            </tr>`;
-          }
+  // 今日の0時
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
-          // 通常のスケジュール行
-          const subj = subjectById(s.subjectId);
-          const actual =
-            s.actualDuration !== undefined && s.actualDuration !== ""
-              ? s.actualDuration
-              : "";
-          return `<tr>
+  // 過去・今日以降に分割
+  const pastList = list.filter((s) => new Date(s.datetime) < todayStart);
+  const futureList = list.filter((s) => new Date(s.datetime) >= todayStart);
+
+  const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+
+  // グループ化ヘルパー
+  function groupByDate(items) {
+    const groups = {};
+    items.forEach((s) => {
+      const d = new Date(s.datetime);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (!groups[key]) groups[key] = { date: d, items: [] };
+      groups[key].items.push(s);
+    });
+    return groups;
+  }
+
+  // ── デスクトップ用テーブル ──────────────────────────
+  function buildTableRow(s) {
+    if (s.isExam) {
+      return `<tr style="background: var(--surface2);">
+        <td data-label="日時">${fmt(s.datetime)}</td>
+        <td data-label="教科"><span class="subject-dot" style="background:${s.color}"></span><strong>${s.subjectName}</strong></td>
+        <td data-label="内容"><strong>${s.content}</strong></td>
+        <td data-label="予定時間">-</td>
+        <td data-label="実績時間">-</td>
+        <td data-label="状況"><span class="badge badge-exam">考査予定</span></td>
+        <td data-label="メモ" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.note}</td>
+        <td data-label="操作"><button class="btn btn-sm" onclick="editExam('${s.id}')">編集</button></td>
+      </tr>`;
+    }
+    const subj = subjectById(s.subjectId);
+    const actual =
+      s.actualDuration !== undefined && s.actualDuration !== ""
+        ? s.actualDuration
+        : "";
+    return `<tr>
       <td data-label="日時">${fmt(s.datetime)}</td>
       <td data-label="教科"><span class="subject-dot" style="background:${subj.color}"></span>${subj.name}</td>
       <td data-label="内容">${s.content || ""}</td>
@@ -472,9 +490,56 @@ function renderSchedule() {
         <button class="btn btn-sm btn-danger" onclick="deleteSchedule('${s.id}')">削除</button>
       </td>
     </tr>`;
-        })
-        .join("")
-    : `<tr class="empty-row"><td colspan="8" class="empty-cell"><div class="empty"><div class="empty-icon">📅</div><p>スケジュールがありません</p></div></td></tr>`;
+  }
+
+  // 日付グループを details 行にまとめる（PC用）
+  function buildTableDateGroup(dateKey, g, isPast) {
+    const d = g.date;
+    const dateStr = `${d.getMonth() + 1}/${d.getDate()}(${dayNames[d.getDay()]})`;
+    const rows = g.items.map(buildTableRow).join("");
+    return `<tr class="tbl-date-group-row${isPast ? " tbl-past-row" : ""}">
+      <td colspan="8" style="padding:0">
+        <details class="tbl-date-details"${isPast ? "" : " open"}>
+          <summary class="tbl-date-summary">
+            <span>${dateStr}</span>
+            <span class="past-day-count">${g.items.length}件</span>
+          </summary>
+          <table style="width:100%;border-collapse:collapse"><tbody>${rows}</tbody></table>
+        </details>
+      </td>
+    </tr>`;
+  }
+
+  const tableEl = document.getElementById("schedule-table");
+  if (!list.length) {
+    tableEl.innerHTML = `<tr class="empty-row"><td colspan="8" class="empty-cell"><div class="empty"><div class="empty-icon">📅</div><p>スケジュールがありません</p></div></td></tr>`;
+  } else {
+    let html = "";
+
+    // 過去を先頭に（折りたたみ、デフォルト閉じ）
+    if (pastList.length) {
+      const pastGroups = groupByDate(pastList);
+      const pastDayRows = Object.entries(pastGroups)
+        .map(([key, g]) => buildTableDateGroup(key, g, true))
+        .join("");
+      html += `<tr class="past-collapse-row">
+        <td colspan="8" style="padding:0">
+          <details class="past-table-details">
+            <summary class="past-table-summary">📂 過去の予定 (${pastList.length}件)</summary>
+            <table style="width:100%;border-collapse:collapse"><tbody>${pastDayRows}</tbody></table>
+          </details>
+        </td>
+      </tr>`;
+    }
+
+    // 今日以降（日付ごとに details、デフォルト開く）
+    const futureGroups = groupByDate(futureList);
+    html += Object.entries(futureGroups)
+      .map(([key, g]) => buildTableDateGroup(key, g, false))
+      .join("");
+
+    tableEl.innerHTML = html;
+  }
 
   // ── モバイル用カード表示 ──────────────────────────────
   const mobileList = document.getElementById("schedule-mobile-list");
@@ -484,97 +549,76 @@ function renderSchedule() {
     return;
   }
 
-  // 日付でグループ化
-  const groups = {};
-  list.forEach((s) => {
-    const d = new Date(s.datetime);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    if (!groups[key]) groups[key] = { date: d, items: [] };
-    groups[key].items.push(s);
-  });
+  function buildExamCard(s) {
+    const color = s.color || "var(--purple)";
+    return `<div class="scm-card scm-exam" style="border-left-color:${color}">
+      <div class="scm-left"><div class="scm-time">${fmt(s.datetime).split(" ")[1] || ""}</div></div>
+      <div class="scm-body">
+        <div class="scm-subject" style="color:${color}">📝 ${s.subjectName}</div>
+        ${s.note ? `<div class="scm-note">${s.note}</div>` : ""}
+      </div>
+      <span class="badge badge-exam">考査</span>
+    </div>`;
+  }
 
-  const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  function buildMobileDateGroup(g, diff, isPast) {
+    const dayLabel =
+      diff === 0 ? "今日" : diff === 1 ? "明日" : diff === -1 ? "昨日" : "";
+    const dateStr = `${g.date.getMonth() + 1}/${g.date.getDate()}(${dayNames[g.date.getDay()]})`;
+    const isToday = diff === 0;
+    const itemsHtml = g.items
+      .map((s) => (s.isExam ? buildExamCard(s) : buildScheduleCard(s)))
+      .join("");
 
-  mobileList.innerHTML = Object.entries(groups)
-    .map(([key, g]) => {
-      const gDate = new Date(g.date);
-      gDate.setHours(0, 0, 0, 0);
-      const diff = Math.round((gDate - today) / 86400000);
-      const dayLabel =
-        diff === 0 ? "今日" : diff === 1 ? "明日" : diff === -1 ? "昨日" : "";
-      const dateStr = `${g.date.getMonth() + 1}/${g.date.getDate()}(${dayNames[g.date.getDay()]})`;
-      const isToday = diff === 0;
-
-      const itemsHtml = g.items
-        .map((s) => {
-          if (s.isExam) {
-            const color = s.color || "var(--purple)";
-            return `<div class="scm-card scm-exam" style="border-left-color:${color}">
-          <div class="scm-left">
-            <div class="scm-time">${fmt(s.datetime).split(" ")[1] || ""}</div>
-          </div>
-          <div class="scm-body">
-            <div class="scm-subject" style="color:${color}">📝 ${s.subjectName}</div>
-            ${s.note ? `<div class="scm-note">${s.note}</div>` : ""}
-          </div>
-          <span class="badge badge-exam">考査</span>
-        </div>`;
-          }
-          const subj = subjectById(s.subjectId);
-          const t = new Date(s.datetime);
-          const timeStr = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
-          const endMin =
-            t.getHours() * 60 +
-            t.getMinutes() +
-            Math.round((parseFloat(s.duration) || 1) * 60);
-          const endStr = `${String(Math.floor(endMin / 60) % 24).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
-          const actual =
-            s.actualDuration !== undefined && s.actualDuration !== ""
-              ? s.actualDuration
-              : "";
-          return `<div class="scm-card${s.status === "done" ? " scm-done" : s.status === "miss" ? " scm-miss" : ""}" style="border-left-color:${subj.color}">
-        <div class="scm-left">
-          <div class="scm-time">${timeStr}</div>
-          <div class="scm-endtime">〜${endStr}</div>
-          <div class="scm-dur">${s.duration || "-"}h</div>
-        </div>
-        <div class="scm-body">
-          <div class="scm-subject" style="color:${subj.color}">${subj.name}</div>
-          ${s.content ? `<div class="scm-content">${s.content}</div>` : ""}
-          ${s.note ? `<div class="scm-note">${s.note}</div>` : ""}
-          <div class="scm-actual-row">
-            <span style="font-size:11px;color:var(--text3)">実績</span>
-            <input type="number" class="scm-actual-input" value="${actual}" min="0" max="24" step="0.25"
-              onchange="saveActual('${s.id}',this.value)" placeholder="-">
-            <span style="font-size:11px;color:var(--text3)">h</span>
-          </div>
-        </div>
-        <div class="scm-right">
-          <div class="scm-status-btns">
-            <button class="scm-btn-status${s.status === "done" ? " scm-s-done" : ""}" onclick="setStatus('${s.id}','done')" title="完了">✓</button>
-            <button class="scm-btn-status${s.status === "partial" ? " scm-s-partial" : ""}" onclick="setStatus('${s.id}','partial')" title="一部">△</button>
-            <button class="scm-btn-status${s.status === "miss" ? " scm-s-miss" : ""}" onclick="setStatus('${s.id}','miss')" title="未実施">✗</button>
-          </div>
-          <div class="scm-ops">
-            <button class="btn btn-sm" onclick="editSchedule('${s.id}')">編集</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteSchedule('${s.id}')">削除</button>
-          </div>
-        </div>
-      </div>`;
-        })
-        .join("");
-
-      return `<div class="scm-group${isToday ? " scm-group-today" : ""}">
+    if (isPast) {
+      // 過去は折りたたみ
+      return `<details class="past-day-details">
+        <summary class="past-day-summary">${dateStr}<span class="past-day-count">${g.items.length}件</span></summary>
+        <div class="past-day-body">${itemsHtml}</div>
+      </details>`;
+    }
+    return `<div class="scm-group${isToday ? " scm-group-today" : ""}">
       <div class="scm-date-header">
         <span class="scm-date-str">${dateStr}</span>
         ${dayLabel ? `<span class="scm-day-label${isToday ? " scm-today-label" : ""}">${dayLabel}</span>` : ""}
       </div>
       ${itemsHtml}
     </div>`;
+  }
+
+  let mobileHtml = "";
+
+  // 過去を先頭に
+  if (pastList.length) {
+    const pastGroups = groupByDate(pastList);
+    const pastDayHtml = Object.entries(pastGroups)
+      .map(([key, g]) => {
+        const gDate = new Date(g.date);
+        gDate.setHours(0, 0, 0, 0);
+        const diff = Math.round((gDate - todayStart) / 86400000);
+        return buildMobileDateGroup(g, diff, true);
+      })
+      .join("");
+    mobileHtml += `<details class="past-section-details">
+      <summary class="past-section-summary">📂 過去の予定 <span class="past-day-count">${pastList.length}件</span></summary>
+      <div class="past-section-body">${pastDayHtml}</div>
+    </details>`;
+  }
+
+  // 今日以降
+  const futureGroups = groupByDate(futureList);
+  mobileHtml += Object.entries(futureGroups)
+    .map(([key, g]) => {
+      const gDate = new Date(g.date);
+      gDate.setHours(0, 0, 0, 0);
+      const diff = Math.round((gDate - todayStart) / 86400000);
+      return buildMobileDateGroup(g, diff, false);
     })
     .join("");
+
+  mobileList.innerHTML =
+    mobileHtml ||
+    `<div class="empty"><div class="empty-icon">📅</div><p>スケジュールがありません</p></div>`;
 }
 
 // ── Timetable mode toggle (mobile) ────────────────────

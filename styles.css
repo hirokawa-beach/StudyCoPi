@@ -388,7 +388,144 @@ tr.drag-over td { background: var(--accent-bg) !important; }
 .notif-check { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
 .notif-sub-option { display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 32px; background: var(--surface); border-radius: var(--radius-sm); margin-top: -2px; }
 
-/* ── Schedule mobile card list (hidden on desktop) ── */
+/* ── 過去の予定 折りたたみ ────────────────────────────── */
+
+/* デスクトップ：日付グループ details 行 */
+.tbl-date-group-row > td { padding: 0 !important; }
+.tbl-date-details { width: 100%; }
+.tbl-date-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.tbl-date-summary::-webkit-details-marker { display: none; }
+.tbl-date-summary::before {
+  content: '▶';
+  font-size: 10px;
+  color: var(--text3);
+  transition: transform 0.18s;
+  flex-shrink: 0;
+}
+.tbl-date-details[open] .tbl-date-summary::before { transform: rotate(90deg); }
+.tbl-past-row .tbl-date-summary { color: var(--text3); background: var(--surface); }
+.tbl-past-row .tbl-date-details[open] table tr { opacity: 0.72; }
+
+/* デスクトップ：テーブル内 details */
+.past-table-details { width: 100%; }
+.past-table-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text3);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+}
+.past-table-summary::-webkit-details-marker { display: none; }
+.past-table-summary::before {
+  content: '▶';
+  font-size: 10px;
+  transition: transform 0.2s;
+}
+.past-table-details[open] .past-table-summary::before { transform: rotate(90deg); }
+.past-table-details[open] table tr { opacity: 0.7; }
+
+/* モバイル：セクション全体 details */
+.past-section-details { margin-top: 8px; }
+.past-section-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text3);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.past-section-summary::-webkit-details-marker { display: none; }
+.past-section-summary::before {
+  content: '▶';
+  font-size: 11px;
+  transition: transform 0.2s;
+}
+.past-section-details[open] .past-section-summary {
+  border-radius: var(--radius) var(--radius) 0 0;
+  border-bottom-color: transparent;
+}
+.past-section-details[open] .past-section-summary::before { transform: rotate(90deg); }
+.past-section-body {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* モバイル：日付ごと details */
+.past-day-details { }
+.past-day-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.past-day-summary::-webkit-details-marker { display: none; }
+.past-day-summary::before {
+  content: '▶';
+  font-size: 10px;
+  color: var(--text3);
+  transition: transform 0.2s;
+}
+.past-day-details[open] .past-day-summary { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.past-day-details[open] .past-day-summary::before { transform: rotate(90deg); }
+.past-day-body {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface);
+}
+.past-day-body .scm-card { opacity: 0.75; }
+.past-day-count {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text3);
+  margin-left: auto;
+}
+
 .schedule-mobile-list { display: none; }
 
 /* ── Schedule mobile card styles ─────────────────── */
