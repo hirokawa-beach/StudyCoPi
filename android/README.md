@@ -3,6 +3,12 @@
 Kotlin + Jetpack Composeで作ったAndroid版です。WebView・Capacitorは使いません。
 Android 8.0（API 26）以降に対応します。Web版はリポジトリ直下に残しています。
 
+## ダウンロード
+
+[StudyCoPi Android 1.2.1 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.2.1/StudyCoPi-Android-1.2.1.apk) をダウンロードして、Android端末で開いてください。
+インストール元のブラウザやファイルアプリに「不明なアプリのインストール」の許可が必要な場合があります。
+開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.2.1) にあります。
+
 ## 機能
 
 - 今日の予定、完了チェック、取り消し、実績時間とメモ
