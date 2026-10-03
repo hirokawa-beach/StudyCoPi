@@ -12,6 +12,7 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('dialog', (d) => d.accept());
   await page.clock.install({time:new Date('2026-10-03T12:00:00+09:00')});
+  await page.addInitScript(() => localStorage.setItem('sl_guide_version','1'));
   await page.goto(url);
   await page.waitForSelector('.today-summary strong');
   const visible = async (selector) => assert.equal(await page.locator(selector).isVisible(), true, selector);
@@ -73,8 +74,11 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
       if (bounds) assert.ok(bounds.width >= 44 && bounds.height >= 44, `touch target ${selector}`);
     }
   }
-  const rowBounds = await page.locator('#dash-mobile-list .study-card').first().boundingBox();
-  assert.ok(rowBounds.height <= 145, 'compact study rows on a phone');
+  const firstCard = page.locator('#dash-mobile-list .study-card').first();
+  const checkBounds = await firstCard.locator('.study-check').boundingBox();
+  const titleBounds = await firstCard.locator('.study-subject').boundingBox();
+  const actionBounds = await firstCard.locator('.study-actions').boundingBox();
+  assert.ok(checkBounds.x > titleBounds.x && actionBounds.y > titleBounds.y, 'Android-style card has right-hand check and bottom actions');
   const firstRow = page.locator('#dash-mobile-list .study-card').filter({hasText:'問題集 p.24〜28'});
   await firstRow.locator('.study-check').tap();
   assert.equal(await evalApp(`schedules.find(s=>s.id==='${s1}').status`),'done');
@@ -98,6 +102,13 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
   await visible('#filter-exam');
   await page.locator('#filter-exam').selectOption(first);
   assert.equal(await page.locator('#schedule-mobile-list .study-card').count(),1);
+  // Switching to the app's weekly tab retains the same trial/subject filters.
+  await page.getByRole('button',{name:'週間表示',exact:true}).click();
+  assert.equal(await page.locator('#week-filter-slot #filter-exam').inputValue(),first);
+  await page.evaluate(()=>selectDay('2026-10-03'));
+  assert.equal(await page.locator('#mobile-day-list .study-card').count(),1);
+  assert.equal(await page.locator('#mobile-day-list').innerText().then(t=>t.includes('模試の過去問')),false);
+  await page.getByRole('button',{name:'一覧',exact:true}).click();
   await page.locator('#filter-exam').selectOption('');
   assert.equal(await evalApp(`StudyModel.totals(StudyModel.forExam(schedules,'${first}')).actual`),1/3);
 
@@ -172,7 +183,7 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
   fs.mkdirSync(path.resolve('.artifacts'),{recursive:true});
   for (const width of [320,390,768,1440]) {
     await page.setViewportSize({width,height:900});
-    for (const view of ['dashboard','schedule','timetable','examgroups','hours','focus','settings','data','more','help']) {
+    for (const view of ['dashboard','schedule','timetable','examgroups','hours','focus','settings','subjects','android','data','more','help']) {
       await evalApp(`showView('${view}')`);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
       assert.equal(overflow,false,`horizontal overflow ${view} @ ${width}`);
@@ -204,7 +215,7 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
   assert.equal(await evalApp('exams.length'),legacy.exams.length);
   assert.deepEqual(errors,[]);
   const unsupported = await browser.newContext({viewport:{width:390,height:844},timezoneId:'Asia/Tokyo'});
-  await unsupported.addInitScript(() => { delete window.Notification; });
+  await unsupported.addInitScript(() => { delete window.Notification; localStorage.setItem("sl_guide_version","1"); });
   const fallback = await unsupported.newPage();
   fallback.on('pageerror', (e) => errors.push(e.message));
   await fallback.goto(url);

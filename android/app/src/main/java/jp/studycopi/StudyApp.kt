@@ -47,6 +47,17 @@ import kotlin.math.roundToInt
     var sheetId by rememberSaveable { mutableStateOf("") }
     var importUri by remember { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
+    val guide = remember { GuideContent.load(context) }
+    var guideVisible by rememberSaveable { mutableStateOf(false) }
+    var guideStep by rememberSaveable { mutableIntStateOf(0) }
+    val guideBounds = remember { mutableStateMapOf<String, androidx.compose.ui.geometry.Rect>() }
+    val displayScreen = if (guideVisible && data.wakeRuns.isEmpty()) listOf("exams", "plans", "timer", "plans", "stats")[guideStep] else screen
+    val displayData = if (guideVisible && guideStep == 3) data.copy(schedules = listOf(Schedule(
+        id = "guide-example", subjectId = data.subjects.firstOrNull()?.id ?: "s1", datetime = "${LocalDate.now()}T17:00",
+        duration = .75, content = "問題集 p.24〜28（操作例・保存されません）"))) else data
+    LaunchedEffect(ready, data.timer?.id, data.wakeRuns.isEmpty()) {
+        if (ready && loadError == null && data.timer == null && data.wakeRuns.isEmpty() && !GuideContent.seen(context, guide.version)) guideVisible = true
+    }
     val snack = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.resume() }
@@ -77,21 +88,22 @@ import kotlin.math.roundToInt
     BackHandler(enabled = screen != "today" && sheet.isEmpty()) { screen = "today" }
     val nav = listOf("today" to "今日", "plans" to "予定", "exams" to "試験", "stats" to "統計", "more" to "その他")
     val navIcons = listOf(Icons.Default.Home, Icons.Default.DateRange, Icons.Default.Star, Icons.AutoMirrored.Filled.List, Icons.Default.MoreVert)
+    CompositionLocalProvider(LocalGuideBounds provides { key, bounds -> guideBounds[key] = bounds }) {
     Scaffold(containerColor = MaterialTheme.colorScheme.background, snackbarHost = { SnackbarHost(snack) },
         topBar = { TopAppBar(title = { Text("StudyCoPi", style = MaterialTheme.typography.titleMedium) },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            navigationIcon = { if (screen !in nav.map { it.first }) IconButton(onClick = { screen = "more" }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
+            navigationIcon = { if (displayScreen !in nav.map { it.first }) IconButton(onClick = { screen = "more" }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
             actions = {
                 IconButton(onClick = { screen = "timer" }) { Icon(Icons.Default.PlayArrow, "集中タイマーを開く") }
-                if (ready && loadError == null && screen in listOf("today", "plans", "exams", "wake")) {
-                    FilledTonalButton(onClick = { open(when (screen) { "exams" -> "group"; "wake" -> "wake"; else -> "schedule" }) },
-                        modifier = Modifier.padding(end = 12.dp), contentPadding = PaddingValues(horizontal = 12.dp)) {
+                if (ready && loadError == null && displayScreen in listOf("today", "plans", "exams", "wake")) {
+                    FilledTonalButton(onClick = { open(when (displayScreen) { "exams" -> "group"; "wake" -> "wake"; else -> "schedule" }) },
+                        modifier = Modifier.padding(end = 12.dp).guideTarget("add"), contentPadding = PaddingValues(horizontal = 12.dp)) {
                         Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("追加")
                     }
                 }
             }) },
         bottomBar = { Column {
-            if (data.timer != null && screen != "timer") {
+            if (data.timer != null && displayScreen != "timer") {
                 val timer = data.timer!!
                 Surface(onClick = { screen = "timer" }, color = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary, shape = RoundedCornerShape(16.dp),
@@ -108,7 +120,7 @@ import kotlin.math.roundToInt
                 }
             }
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-                nav.forEachIndexed { index, (key, label) -> NavigationBarItem(selected = screen == key || (screen == "timer" && key == "today"),
+                nav.forEachIndexed { index, (key, label) -> NavigationBarItem(selected = displayScreen == key || (displayScreen == "timer" && key == "today") || (displayScreen !in nav.map { it.first } && displayScreen != "timer" && key == "more"),
                     onClick = { screen = key }, icon = { Icon(navIcons[index], null) }, label = { Text(label) }) }
             }
         } }) { padding ->
@@ -118,23 +130,29 @@ import kotlin.math.roundToInt
                     Text(loadError!!); Button(onClick = { import.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }) { Text("バックアップから復元") }
                 }
                 !ready -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                screen == "today" -> TodayScreen(data, model, { open("schedule", it) }, { open("record", it) },
+                displayScreen == "today" -> TodayScreen(data, model, { open("schedule", it) }, { open("record", it) },
                     { screen = "timer" }, { id -> examFilter = id; screen = "stats" }, { open("group") })
-                screen == "plans" -> PlansScreen(data, model, examFilter, { examFilter = it },
-                    { open("schedule", it) }, { open("record", it) }, { screen = "timer" }, { open("exam", it) })
-                screen == "exams" -> ExamsScreen(data, { open("group", it) }, { open("exam", it) },
+                displayScreen == "plans" -> key(if (guideVisible) "tour-$guideStep" else "plans") {
+                    PlansScreen(displayData, model, if (guideVisible) "" else examFilter, { examFilter = it },
+                        { open("schedule", it) }, { open("record", it) }, { screen = "timer" }, { open("exam", it) })
+                }
+                displayScreen == "exams" -> ExamsScreen(data, { open("group", it) }, { open("exam", it) },
                     { examFilter = it; screen = "stats" }, { examFilter = it; screen = "plans" }, { open("newExam", it) })
-                screen == "stats" -> StatsScreen(data, examFilter, { examFilter = it })
-                screen == "timer" -> TimerScreen(data, point, model, { requestNotifications() })
-                screen == "subjects" -> SubjectsScreen(data, model, { open("subject", it) })
-                screen == "settings" -> SettingsScreen(data, model, { requestNotifications() })
-                screen == "wake" -> WakeAlarmsScreen(data, model, { open("wake", it) }, { requestNotifications() })
-                screen == "backup" -> BackupScreen(data, { export.launch("StudyCoPi-${LocalDate.now()}.json") },
+                displayScreen == "stats" -> StatsScreen(data, examFilter, { examFilter = it })
+                displayScreen == "timer" -> TimerScreen(data, point, model, { requestNotifications() })
+                displayScreen == "subjects" -> SubjectsScreen(data, model, { open("subject", it) })
+                displayScreen == "settings" -> SettingsScreen(data, model, { requestNotifications() })
+                displayScreen == "wake" -> WakeAlarmsScreen(data, model, { open("wake", it) }, { requestNotifications() })
+                displayScreen == "backup" -> BackupScreen(data, { export.launch("StudyCoPi-${LocalDate.now()}.json") },
                     { import.launch(arrayOf("application/json", "text/*", "application/octet-stream")) })
-                screen == "help" -> HelpScreen()
+                displayScreen == "help" -> StudyHelpScreen(guide, { guideStep = 0; guideVisible = true }, { screen = it })
                 else -> MoreScreen { screen = it }
             }
         }
+    }
+    }
+    if (guideVisible && ready && data.wakeRuns.isEmpty()) StudyGuideDialog(guide, guideStep, guideBounds[listOf("add", "add", "timer-start", "record", "stats-filter")[guideStep]], { guideStep = it }) {
+        GuideContent.markSeen(context, guide.version); guideVisible = false
     }
     if (sheet.isNotEmpty() && ready) {
         ModalBottomSheet(onDismissRequest = { sheet = "" }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -174,7 +192,7 @@ import kotlin.math.roundToInt
     edit: (String) -> Unit, record: (String) -> Unit, timer: () -> Unit) {
     val subject = data.subject(item.subjectId)
     // The card measures its content; a five-minute plan has the same readable name as a long plan.
-    Card(Modifier.fillMaxWidth().padding(bottom = 10.dp).testTag("schedule-${item.id}"),
+    Card(Modifier.fillMaxWidth().padding(bottom = 10.dp).testTag(if (item.id == "guide-example") "guide-target-record" else "schedule-${item.id}").then(if (item.id == "guide-example") Modifier.guideTarget("record") else Modifier),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -447,7 +465,7 @@ import kotlin.math.roundToInt
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp)) {
         item {
             PageTitle("学習の統計")
-            ChoiceField("対象の試験", examFilter, groupChoices(data, all = true), filter)
+            Box(Modifier.guideTarget("stats-filter")) { ChoiceField("対象の試験", examFilter, groupChoices(data, all = true), filter) }
             Spacer(Modifier.height(12.dp))
             ChoiceField("期間", period, listOf("all" to "すべての期間", "week" to "今週", "month" to "今月", "custom" to "期間を指定")) { period = it }
             if (period == "custom") Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -513,14 +531,14 @@ private fun timerText(milliseconds: Long): String {
                 listOf(15, 25, 45, 60).forEach { preset -> OutlinedButton(onClick = { minutes = preset.toString() }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("${preset}分") } }
             }
             Button(onClick = { model.startTimer(subject, group, minutes.toIntOrNull() ?: 0) },
-                enabled = minutes.toIntOrNull() in 1..1440 && data.subjects.any { it.id == subject }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("勉強を始める") }
+                enabled = minutes.toIntOrNull() in 1..1440 && data.subjects.any { it.id == subject }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).guideTarget("timer-start")) { Text("勉強を始める") }
             Text("画面を閉じても時間を計測します。終了時に勉強時間を保存します。", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(data.subject(timer.subjectId).name, style = MaterialTheme.typography.titleLarge)
                     if (timer.examGroupId.isNotEmpty()) Text(data.groupName(timer.examGroupId), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Box(Modifier.padding(vertical = 24.dp).size(224.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.padding(vertical = 24.dp).size(224.dp).guideTarget("timer-start"), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(progress = { (timer.elapsed(point).toFloat() / timer.targetMs).coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxSize(), strokeWidth = 7.dp, trackColor = MaterialTheme.colorScheme.surfaceContainerHigh)
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -557,7 +575,7 @@ private fun timerText(milliseconds: Long): String {
     LazyColumn(contentPadding = PaddingValues(20.dp)) {
         item { PageTitle("その他") }
         items(listOf(Triple("timer", "集中タイマー", "予定を作らず、そのまま勉強を始める"), Triple("wake", "目覚まし", "計算問題とNFCタグで、2段階解除"), Triple("subjects", "教科", "教科の追加・編集・並び替え"),
-            Triple("settings", "通知設定", "タイマー終了・学習予定・試験の通知"), Triple("backup", "バックアップ", "Web版のデータを引き継ぐ・ファイルに保存"), Triple("help", "使い方", "学習記録とタイマーについて"))) { (key, title, description) ->
+            Triple("settings", "通知設定", "タイマー終了・学習予定・試験の通知"), Triple("backup", "バックアップ", "別の端末へ引き継ぐ・ファイルに保存"), Triple("help", "使い方", "初めての方へ・操作ガイド"))) { (key, title, description) ->
             Card(onClick = { navigate(key) }, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 ListItem(headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) }, supportingContent = { Text(description, style = MaterialTheme.typography.bodySmall) },
@@ -607,17 +625,8 @@ private fun timerText(milliseconds: Long): String {
         Text("教科 ${data.subjects.size}件・試験 ${data.examGroups.size}件\n学習記録 ${data.schedules.size}件・教科別日程 ${data.exams.size}件")
         Button(onClick = export, enabled = data.timer == null, modifier = Modifier.fillMaxWidth()) { Text("ファイルに保存") }
         OutlinedButton(onClick = import, enabled = data.timer == null, modifier = Modifier.fillMaxWidth()) { Text("ファイルから復元") }
-        Text("Web版の「データ保存」で出力したJSONファイルを読み込めます。Android版のバックアップもWeb版で復元できます。", fontSize = 14.sp)
+        Text("Web版の「バックアップ」で出力したJSONファイルを読み込めます。Android版のバックアップもWeb版で復元できます。", fontSize = 14.sp)
         Text("ブラウザ版とアプリ版のデータは、自動で同期されません。", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (data.timer != null) Text("タイマーを終了してからバックアップしてください。", fontSize = 13.sp)
-    }
-}
-@Composable private fun HelpScreen() {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        PageTitle("使い方")
-        Text("1. 「試験」の追加から、考査・模試を1回ずつ登録します。\n2. 学習予定を追加するときに対象の試験を選びます。\n3. 「開始」でタイマー、「記録」で実際の時間を保存します。\n4. 「統計」で試験ごとの準備時間を確認できます。")
-        Text("左のチェックで完了にすると、まだ実績がなければ予定時間を実績として記録します。計測済みの時間は保持します。取り消しは画面下の「元に戻す」から。")
-        Text("タイマーは開始・停止時刻で計測するため、画面を閉じても続きます。一時停止の時間は含めません。アプリを強制停止した場合は終了通知が届かないことがあります。再度開くと時間を復元します。")
-        Text("データは端末内に保存します。Web版からの移行や機種変更の前には、バックアップをファイルに保存してください。")
     }
 }

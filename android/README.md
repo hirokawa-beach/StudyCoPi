@@ -5,9 +5,9 @@ Android 8.0（API 26）以降に対応します。Web版はリポジトリ直下
 
 ## ダウンロード
 
-[StudyCoPi Android 1.2.1 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.2.1/StudyCoPi-Android-1.2.1.apk) をダウンロードして、Android端末で開いてください。
+[StudyCoPi Android 1.3.0 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.3.0/StudyCoPi-Android-1.3.0.apk) をダウンロードして、Android端末で開いてください。
 インストール元のブラウザやファイルアプリに「不明なアプリのインストール」の許可が必要な場合があります。
-開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.2.1) にあります。
+開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.3.0) にあります。
 
 ## 機能
 
@@ -21,6 +21,23 @@ Android 8.0（API 26）以降に対応します。Web版はリポジトリ直下
 - 教科の追加・編集・色・並び替え
 - 学習予定の開始前・試験前日・タイマー終了のAndroid通知
 - JSONバックアップの保存・復元（Web版のv3と旧形式を読み込み可能）
+
+## チュートリアルと共通UI（1.3）
+
+Web・Androidともに、初回に5ステップの使い方を表示します。
+試験の登録 → 予定の追加 → タイマー → 実績の記録 → 統計の順で、実際の画面を確認します。
+対象のボタンやカードをハイライトし、その近くに短い案内を重ねて表示します。
+記録の操作例は表示だけで、保存データに追加されません。
+「あとで」で閉じられ、初回終了後は「その他 → 使い方 → チュートリアルを見る」から再表示できます。
+使い方には操作別の説明と該当画面へのボタンもあります。チュートリアルは学習データを変更しません。
+
+スマホ版WebはAndroidに合わせた5つのタブ（今日・予定・試験・統計・その他）、
+予定カード、配色、日本語フォント、週間の日付選択、円形タイマーを使用します。
+画面固定とNFC目覚ましはAndroid版で利用できます。学習データの端末間移行にはバックアップを使います。
+
+共通の説明文はリポジトリ直下の `shared/study-guide.json` が原本です。
+WebはService Workerでオフライン用に保存し、Androidは同じファイルをAPKのassetsに組み込みます。
+説明の更新時はこのファイルを編集し、初回ガイドを再表示する場合は `version` を増やします。
 
 ## UI（1.1）
 

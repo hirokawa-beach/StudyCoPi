@@ -1,0 +1,82 @@
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const TOUR_VIEWS_FOR_TEST=['examgroups','schedule','focus','schedule','hours'];
+const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
+(async () => {
+  const browser = await chromium.launch({headless:true,channel:process.env.STUDYCOPI_BROWSER_CHANNEL || 'chrome'});
+  const context = await browser.newContext({viewport:{width:320,height:740},timezoneId:'Asia/Tokyo',isMobile:true,hasTouch:true});
+  const page = await context.newPage(); const errors=[];
+  page.on('pageerror', error=>errors.push(error.message));
+  await page.goto(url);
+  await page.waitForSelector('#guide-dialog[open]');
+  assert.equal(await page.locator('#guide-count').textContent(),'1 / 5');
+  assert.equal(await page.locator('#guide-back').isDisabled(),true);
+  const initial = await page.evaluate(()=>JSON.stringify({subjects,schedules,examGroups,exams}));
+  await page.locator('#guide-next').click();
+  assert.equal(await page.locator('#guide-count').textContent(),'2 / 5');
+  await page.locator('#guide-back').click();
+  assert.equal(await page.locator('#guide-count').textContent(),'1 / 5');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#guide-dialog').isVisible(),false);
+  await page.reload(); await page.waitForFunction(()=>guideContent!==null);
+  assert.equal(await page.locator('#guide-dialog').isVisible(),false);
+  await page.locator('[data-view=more]').click();
+  await page.locator('.more-menu button').filter({hasText:'使い方'}).click();
+  await page.getByRole('button',{name:'チュートリアルを見る'}).click();
+  fs.mkdirSync('.artifacts',{recursive:true});
+  await page.evaluate(()=>document.fonts.ready);
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.guide-shell')).opacity==='1');
+  await page.screenshot({path:'.artifacts/web-guide-320.png'});
+  for (const step of [1,2,3,4]) {
+    assert.equal(await page.locator('#guide-count').textContent(),`${step} / 5`);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+    assert.equal(await page.evaluate(()=>document.body.dataset.view),TOUR_VIEWS_FOR_TEST[step-1]);
+    await page.waitForFunction(()=>{
+      const target = guideTarget?.getBoundingClientRect(), panel = document.querySelector('.guide-shell').getBoundingClientRect();
+      return target && target.width>0 && target.top>=0 && target.bottom<=innerHeight
+        && panel.top>=0 && panel.bottom<=innerHeight+1
+        && (panel.bottom<=target.top-5 || panel.top>=target.bottom+5);
+    });
+    if (step===4) await page.screenshot({path:'.artifacts/web-guide-record-320.png'});
+    await page.locator('#guide-next').click();
+  }
+  assert.equal(await page.locator('#guide-next').textContent(),'使い始める');
+  assert.equal(await page.evaluate(()=>document.body.dataset.view),'hours');
+  await page.locator('#guide-next').click();
+  assert.equal(await page.evaluate(()=>JSON.stringify({subjects,schedules,examGroups,exams})),initial);
+  await page.locator('.help-topic').filter({hasText:'予定を追加・編集する'}).locator('summary').click();
+  await page.getByRole('button',{name:'予定を開く',exact:true}).click();
+  assert.equal(await page.locator('#view-schedule').isVisible(),true);
+  await page.evaluate(()=>navigator.serviceWorker.ready);
+  await page.waitForFunction(()=>navigator.serviceWorker.controller !== null);
+  await context.setOffline(true);
+  await page.reload(); await page.waitForFunction(()=>guideContent!==null);
+  await page.evaluate(()=>showView('help'));
+  await page.getByRole('button',{name:'チュートリアルを見る'}).click();
+  assert.equal(await page.locator('#guide-dialog').isVisible(),true);
+  await context.setOffline(false);
+  await page.emulateMedia({colorScheme:'dark'});
+  await page.evaluate(()=>document.fonts.ready);
+  await page.screenshot({path:'.artifacts/web-guide-dark-320.png'});
+  await page.getByRole('button',{name:'あとで',exact:true}).click();
+  // The common subject controls must preserve records during reorder and deletion.
+  await page.evaluate(()=>showView('subjects'));
+  const subjectBefore = await page.evaluate(()=>subjects.map(s=>s.id));
+  await page.locator('#subjects-list .subject-row').first().getByRole('button',{name:/を下へ/}).click();
+  assert.deepEqual(await page.evaluate(()=>subjects.map(s=>s.id)),[subjectBefore[1],subjectBefore[0],...subjectBefore.slice(2)]);
+  await page.locator('#subjects-list .subject-row').first().getByRole('button',{name:/を編集/}).click();
+  await page.locator('#m-sname').fill('英語・長い名前の教科');
+  await page.locator('#modal-form button[type=submit]').click();
+  assert.equal(await page.locator('#subjects-list strong').first().textContent(),'英語・長い名前の教科');
+  await page.evaluate(()=> { schedules.push({id:'protected',subjectId:subjects[0].id,datetime:StudyModel.localDate()+'T17:00',duration:1,status:'pending'}); deleteSubject(subjects[0].id); });
+  assert.equal(await page.evaluate(()=>subjects.length),subjectBefore.length);
+  await page.locator('#subjects-list .subject-row').nth(1).getByRole('button',{name:/を編集/}).click();
+  page.once('dialog', d=>d.accept());
+  await page.locator('#modal-form').getByRole('button',{name:'削除',exact:true}).click();
+  assert.equal(await page.evaluate(()=>subjects.length),subjectBefore.length-1);
+  assert.equal(await page.locator('#modal-backdrop').isVisible(),false);
+  assert.deepEqual(errors,[]);
+  await browser.close();
+  console.log('PASS: first-run guide, skip persistence, replay, all steps, unchanged data, help links and offline guide');
+})().catch(error=>{console.error(error);process.exit(1)});

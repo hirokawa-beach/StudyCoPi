@@ -21,9 +21,11 @@ import java.time.LocalDate
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ComposeFlowTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
-    private fun ready() { compose.waitUntil(15_000) { compose.onAllNodesWithText("今日の学習").fetchSemanticsNodes().isNotEmpty() } }
+    private fun ready() { compose.waitUntil(15_000) { compose.onAllNodesWithText("今日の学習").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("study-guide").fetchSemanticsNodes().isNotEmpty() } }
     @Before fun resetData() {
         ready()
+        compose.waitForIdle()
+        if (compose.onAllNodesWithText("あとで").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithText("あとで").performClick()
         runBlocking { ApplicationProvider.getApplicationContext<StudyApplication>().repository.restore(StudyData()) }
         compose.waitForIdle()
     }

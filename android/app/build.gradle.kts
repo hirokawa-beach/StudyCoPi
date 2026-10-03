@@ -9,11 +9,12 @@ android {
         applicationId = "jp.studycopi"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.2.1"
+        versionCode = 5
+        versionName = "1.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }
+    sourceSets.getByName("main").assets.srcDir(rootProject.projectDir.parentFile.resolve("shared"))
     bundle { language { enableSplit = false } }
     testOptions {
         unitTests.isIncludeAndroidResources = true

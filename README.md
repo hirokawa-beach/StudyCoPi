@@ -4,7 +4,24 @@
 Android版は [android](android/) にあります。Kotlin + Jetpack Composeで実装しています。
 Android Studioで開き、実行・ビルドする方法は [Android版のREADME](android/README.md) を参照してください。
 
-[Android版APK（1.2.1）をダウンロード](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.2.1/StudyCoPi-Android-1.2.1.apk) · [Releaseと変更内容](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.2.1)
+[Android版APK（1.3.0）をダウンロード](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.3.0/StudyCoPi-Android-1.3.0.apk) · [Releaseと変更内容](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.3.0)
+
+## チュートリアルと共通UI（1.3）
+
+Web・Androidともに、初回に5ステップの使い方を表示します。
+試験の登録 → 予定の追加 → タイマー → 実績の記録 → 統計の順で、実際の画面を確認します。
+対象のボタンやカードをハイライトし、その近くに短い案内を重ねて表示します。
+記録の操作例は表示だけで、保存データに追加されません。
+「あとで」で閉じられ、初回終了後は「その他 → 使い方 → チュートリアルを見る」から再表示できます。
+使い方には操作別の説明と該当画面へのボタンもあります。チュートリアルは学習データを変更しません。
+
+スマホ版WebはAndroidに合わせた5つのタブ（今日・予定・試験・統計・その他）、
+予定カード、配色、日本語フォント、週間の日付選択、円形タイマーを使用します。
+画面固定とNFC目覚ましはAndroid版で利用できます。学習データの端末間移行にはバックアップを使います。
+
+共通の説明文はリポジトリ直下の `shared/study-guide.json` が原本です。
+WebはService Workerでオフライン用に保存し、Androidは同じファイルをAPKのassetsに組み込みます。
+説明の更新時はこのファイルを編集し、初回ガイドを再表示する場合は `version` を増やします。
 
 <お知らせとお願いと言い訳> <br>
 最新バージョンはv0.0.1で、不安定版です。<br>

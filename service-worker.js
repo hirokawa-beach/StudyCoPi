@@ -1,10 +1,14 @@
-const CACHE_NAME = "studycopi-v5";
+const CACHE_NAME = "studycopi-v7";
 const ASSETS = [
   "./",
   "./index.html",
   "./app.js",
   "./study-model.js",
   "./ui.css",
+  "./app-ui.css",
+  "./guide.js",
+  "./shared/study-guide.json",
+  "./assets/material-icons.svg",
   "./styles.css",
   "./assets/fonts/noto_sans_jp.woff2",
   "./manifest.json",

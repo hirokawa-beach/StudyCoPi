@@ -6,6 +6,7 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
   const page = await browser.newPage({viewport:{width:390,height:844},locale:'en-US',timezoneId:'Asia/Tokyo'});
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => localStorage.setItem('sl_guide_version','1'));
   await page.goto(url);
   await page.waitForSelector('.today-summary strong');
   await page.evaluate(() => {

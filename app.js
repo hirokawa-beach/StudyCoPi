@@ -41,7 +41,7 @@ let focusExamGroupId = "";
 let focusSessionStart = null;
 let focusFinishing = false;
 let weekOffset = 0;
-let hoursMode = "actual"; // 'actual' | 'planned' | 'both'
+let hoursMode = "both"; // 'actual' | 'planned' | 'both'
 let showExamsInSchedule = true;
 
 // ── Utilities ─────────────────────────────────────────
@@ -168,12 +168,14 @@ function showView(name) {
     if (active) n.setAttribute("aria-current", "page"); else n.removeAttribute("aria-current");
   });
   const mainViews = ["dashboard", "schedule", "examgroups", "hours"];
+  document.body.dataset.subpage = String(![...mainViews, "more", "timetable"].includes(name));
   document.querySelectorAll(".mobile-bottom-nav button").forEach((b) => {
-    const active = b.dataset.view === (mainViews.includes(name) ? name : name === "focus" ? "dashboard" : "more");
+    const active = b.dataset.view === (mainViews.includes(name) ? name : name === "timetable" ? "schedule" : name === "focus" ? "dashboard" : "more");
     b.classList.toggle("active", active);
     if (active) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   });
   document.body.dataset.view = name;
+  if (name === 'schedule' || name === 'timetable') document.getElementById(name === 'schedule' ? 'schedule-filter-slot' : 'week-filter-slot').append(document.getElementById('schedule-filters'));
   if (name === "settings") loadNotifSettingsUI();
   render();
   window.scrollTo({ top: 0, behavior: "instant" });
@@ -182,7 +184,7 @@ function render() {
   const view = document.querySelector(".view.active")?.id.replace("view-", "");
   if (view === "schedule") { populateSubjectFilter(); populateExamFilters(); renderSchedule(); }
   else if (view === "dashboard") renderDashboard();
-  else if (view === "timetable") renderTimetable();
+  else if (view === "timetable") { populateSubjectFilter(); populateExamFilters(); renderTimetable(); }
   else if (view === "examgroups") renderExamGroups();
   else if (view === "hours") { populateExamFilters(); renderHours(); }
   else if (view === "focus") renderFocusSetup();
@@ -195,18 +197,19 @@ function quickAdd() {
 }
 
 // ── Shared: スケジュールカード HTML（モバイル用）────────
+function appIcon(name) { return `<svg class="app-icon" aria-hidden="true" focusable="false"><use href="assets/material-icons.svg#${name}" /></svg>`; }
 function buildScheduleCard(s) {
   const subject = subjectById(s.subjectId);
   const time = new Date(s.datetime).toLocaleTimeString("ja-JP", {hour:"2-digit", minute:"2-digit"});
   const done = s.status === "done", finished = done || s.status === "miss";
   const actual = StudyModel.actualHours(s);
   return `<article class="study-card ${finished ? "study-finished" : ""}">
-    <button class="study-check" aria-label="${esc(subject.name)}の予定を${done ? "未記録に戻す" : "完了にする"}" aria-pressed="${done}" onclick="quickComplete('${s.id}')">${done ? "✓" : ""}</button>
-    <div class="study-body"><button class="study-title-button" onclick="editSchedule('${s.id}')" aria-label="${esc(subject.name)}の予定を編集"><span class="study-card-head"><span class="study-subject"><span class="subject-dot" style="background:${subject.color}"></span>${esc(subject.name)}</span><span class="study-time">${time}</span></span>${s.content ? `<span class="study-content">${esc(s.content)}</span>` : ""}</button>
-      <div class="study-meta"><span>${durationText(s.duration)}${actual > 0 ? ` / 実績 ${durationText(actual)}` : ""}</span>${s.status === "partial" ? '<span>一部完了</span>' : s.status === "miss" ? '<span>未実施</span>' : ""}</div>
-      ${s.examGroupId ? `<div class="exam-link-label">${esc(groupName(s.examGroupId))}</div>` : ""}
-    </div>
-    <div class="study-actions">${!finished ? `<button class="btn btn-primary" onclick="startScheduleFocus('${s.id}')" aria-label="${esc(subject.name)}のタイマーを開始">開始</button>` : ""}<button class="btn btn-quiet" onclick="openRecord('${s.id}')">記録</button></div>
+    <div class="study-row-head"><button class="study-title-button" onclick="editSchedule('${s.id}')" aria-label="${esc(subject.name)}の予定を編集"><span class="study-time"><span class="subject-dot" style="background:${subject.color}"></span>${time} · ${durationText(s.duration)}</span><span class="study-subject">${esc(subject.name)}</span></button>
+    <button class="study-check" aria-label="${esc(subject.name)}の完了を切り替え" aria-pressed="${done}" onclick="quickComplete('${s.id}')">${done ? "✓" : ""}</button></div>
+    ${s.content ? `<button class="study-title-button study-content" onclick="editSchedule('${s.id}')">${esc(s.content)}</button>` : ""}
+    ${s.examGroupId ? `<div class="exam-link-label">${esc(groupName(s.examGroupId))}</div>` : ""}
+    ${actual > 0 || s.actualDuration !== undefined || s.status !== 'pending' ? `<div class="study-meta">${s.status === 'done' ? '完了' : s.status === 'partial' ? '一部完了' : s.status === 'miss' ? '未実施' : '計測済み'} · 実績 ${durationText(actual)}</div>` : ''}
+    <div class="study-actions"><button class="icon-button" onclick="editSchedule('${s.id}')" aria-label="${esc(subject.name)}の予定を編集">${appIcon('edit')}</button><button class="btn btn-quiet" onclick="openRecord('${s.id}')">記録</button>${!finished ? `<button class="btn btn-tonal start-button" onclick="startScheduleFocus('${s.id}')" aria-label="${esc(subject.name)}のタイマーを開始">${appIcon('play')}開始</button>` : ""}</div>
   </article>`;
 }
 function quickComplete(id) {
@@ -242,12 +245,12 @@ function renderDashboard() {
     + (!items.length ? emptyState("今日の予定はありません。", "予定を追加") : !pending.length ? '<p class="all-done">今日の予定は完了しました。</p>' : "")
     + (finished.length ? `<details class="completed-list"><summary>完了・未実施 ${finished.length}件</summary>${finished.map(buildScheduleCard).join("")}</details>` : "");
   const total = StudyModel.totals(items);
-  document.getElementById("dash-stats").innerHTML = `<div><span>今日の勉強</span><strong>${durationText(total.actual)}</strong></div><div><span>完了</span><strong>${total.done}<small> / ${total.count}件</small></strong></div>`;
+  document.getElementById("dash-stats").innerHTML = `<div><span>今日の勉強</span><strong>${durationText(total.actual)}</strong></div><div><span>予定時間</span><strong>${durationText(total.planned)}</strong></div><div class="today-progress" style="grid-column:1/-1;flex-direction:row;align-items:center;width:100%"><progress max="${total.count || 1}" value="${total.done}" aria-label="今日の完了率"></progress><span>${total.done} / ${total.count}件 完了</span></div>`;
   const upcoming = [...examGroups].filter((g) => g.endDate >= today).sort((a,b) => a.startDate.localeCompare(b.startDate))[0];
-  document.getElementById("dash-exam-countdown").innerHTML = upcoming ? `<button class="exam-home-card" onclick="viewExamHours('${upcoming.id}')"><span><small>次の試験</small><strong>${esc(upcoming.name)}</strong></span><span>${upcoming.startDate <= today ? "実施中" : countdownText(daysUntil(upcoming.startDate))}<b> →</b></span></button>` : `<button class="exam-home-card" onclick="showView('examgroups')"><strong>考査・模試を登録</strong><span>試験ごとに準備を管理 →</span></button>`;
+  document.getElementById("dash-exam-countdown").innerHTML = `<h2 class="section-title exam-prep-title">試験の準備</h2><button class="exam-home-card" onclick="${upcoming ? `viewExamHours('${upcoming.id}')` : "openModal('examgroup')"}"><small>${upcoming ? upcoming.startDate <= today ? "試験期間中" : countdownText(daysUntil(upcoming.startDate)) : "次の試験"}</small><span class="exam-home-name"><strong>${esc(upcoming?.name || "考査・模試を登録")}</strong>${appIcon('chevron')}</span>${upcoming ? `<span class="muted">${fmtDate(upcoming.startDate)}</span>` : ""}</button>`;
   const from = StudyModel.weekStart(now), to = new Date(from); to.setDate(to.getDate()+7);
   const week = StudyModel.totals(filterByPeriod(schedules, {from,to}));
-  document.getElementById("dash-week").innerHTML = `<button class="week-summary" onclick="showView('hours')"><span>今週の勉強</span><strong>${durationText(week.actual)}</strong><span>統計 →</span></button>`;
+  document.getElementById("dash-week").innerHTML = `<button class="week-summary" onclick="showView('hours')"><span>今週の勉強 ${durationText(week.actual)}</span>${appIcon('chevron')}</button>`;
 }
 
 // ── Schedule filter ───────────────────────────────────
@@ -302,11 +305,21 @@ function renderSchedule() {
   const past = [...grouped].filter(([date]) => date < today), future = [...grouped].filter(([date]) => date >= today);
   document.getElementById("schedule-mobile-list").innerHTML = list.length ? future.map(([date, items]) => groupHtml(date, items)).join("")
     + (past.length ? `<details class="past-archive"><summary>過去の予定 · ${past.reduce((n, [,items]) => n + items.length, 0)}件</summary>${past.reverse().map(([date, items]) => groupHtml(date, items)).join("")}</details>` : "") : emptyState("この条件の予定はありません。");
+  if (document.body.dataset.view === 'timetable') renderTimetable();
+}
+function timetableData() {
+  const group = document.getElementById('filter-exam').value;
+  const subject = document.getElementById('filter-subject').value;
+  const status = document.getElementById('filter-status').value;
+  return {
+    plans: StudyModel.forExam(schedules,group).filter(s=>(!subject || s.subjectId===subject) && (!status || (s.status || 'pending')===status)),
+    exams: showExamsInSchedule && !status ? StudyModel.forExam(exams,group).filter(e=>!subject || subjectById(subject).name===e.subject) : []
+  };
 }
 let ttMode = "list";
 function setTTMode(mode) { ttMode = mode; applyTTMode(); layoutTimetableBlocks(); }
 function applyTTMode() {
-  const mobile = window.innerWidth <= 700, grid = !mobile || ttMode === "grid";
+  const grid = ttMode === "grid";
   document.getElementById("timetable-grid").style.display = grid ? "" : "none";
   document.getElementById("mobile-day-list").style.display = grid ? "none" : "";
   for (const mode of ["list", "grid"]) document.getElementById("tt-mode-" + mode)?.setAttribute("aria-pressed", String(ttMode === mode));
@@ -314,6 +327,7 @@ function applyTTMode() {
 
 // ── Timetable ─────────────────────────────────────────
 function renderTimetable() {
+  const {plans: weekPlans, exams: weekExams} = timetableData();
   const now = new Date();
   const base = new Date(now);
   base.setDate(now.getDate() - (now.getDay() + 6) % 7 + weekOffset * 7);
@@ -335,7 +349,7 @@ function renderTimetable() {
   let minHour = 6,
     maxHour = 22;
 
-  schedules.forEach((s) => {
+  weekPlans.forEach((s) => {
     if (
       !dates.some(
         (d) => d.toDateString() === new Date(s.datetime).toDateString(),
@@ -349,7 +363,7 @@ function renderTimetable() {
       Math.ceil(t.getHours() + (parseFloat(s.duration) || 1)),
     );
   });
-  exams.forEach((e) => {
+  weekExams.forEach((e) => {
     if (
       !dates.some(
         (d) => d.toDateString() === new Date(e.date + "T00:00").toDateString(),
@@ -396,11 +410,11 @@ function renderTimetable() {
   dates.forEach((d, i) => {
     const isToday = d.toDateString() === now.toDateString();
 
-    const daySchedules = schedules
+    const daySchedules = weekPlans
       .filter((s) => new Date(s.datetime).toDateString() === d.toDateString())
       .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
 
-    const dayExams = exams.filter(
+    const dayExams = weekExams.filter(
       (e) => new Date(e.date + "T00:00").toDateString() === d.toDateString(),
     );
 
@@ -495,14 +509,16 @@ function layoutTimetableBlocks() {
 document.fonts.ready.then(() => layoutTimetableBlocks());
 
 function renderMobileDayList(base, now) {
+  const {plans: weekPlans, exams: weekExams} = timetableData();
   const container = document.getElementById("mobile-day-list");
   const dates = Array.from({length:7}, (_, i) => { const d = new Date(base); d.setDate(base.getDate() + i); return StudyModel.localDate(d); });
   if (!dates.includes(selectedDay)) selectedDay = dates.includes(StudyModel.localDate(now)) ? StudyModel.localDate(now) : dates[0];
-  const items = schedules.filter((s) => StudyModel.localDate(s.datetime) === selectedDay).sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
-  const sessions = exams.filter((e) => e.date === selectedDay);
+  const items = weekPlans.filter((s) => StudyModel.localDate(s.datetime) === selectedDay).sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+  const sessions = weekExams.filter((e) => e.date === selectedDay);
   container.innerHTML = `<div class="day-selector" aria-label="表示する日">${dates.map((date) => {
     const d = new Date(date + "T00:00");
-    return `<button class="${date === selectedDay ? "selected" : ""}" aria-pressed="${date === selectedDay}" onclick="selectDay('${date}')"><span>${d.toLocaleDateString("ja-JP", {weekday:"short"})}</span><strong>${d.getDate()}</strong></button>`;
+    const hasPlans = weekPlans.some(s=>StudyModel.localDate(s.datetime)===date) || weekExams.some(e=>e.date===date);
+    return `<button class="${date === selectedDay ? "selected" : ""}" aria-pressed="${date === selectedDay}" onclick="selectDay('${date}')"><span>${d.toLocaleDateString("ja-JP", {weekday:"short"})}</span><strong>${d.getDate()}</strong><i class="day-mark ${hasPlans ? 'has-plans' : ''}" aria-hidden="true"></i></button>`;
   }).join("")}</div><div class="section-header"><h2 class="section-title">${fmtDate(selectedDay)}の予定</h2><button class="btn btn-sm" onclick="openModal('schedule',{datetime:'${selectedDay}T17:00'})">＋ 追加</button></div>${sessions.map(examSessionCard).join("")}${items.map(buildScheduleCard).join("")}${!items.length && !sessions.length ? '<p class="empty-state">この日の予定はありません。</p>' : ""}`;
 }
 function selectDay(date) { selectedDay = date; renderTimetable(); }
@@ -522,7 +538,7 @@ function renderExamGroups() {
   document.getElementById("exam-groups-list").innerHTML = groups.length ? groups.map((g) => {
     const total = StudyModel.totals(StudyModel.forExam(schedules, g.id));
     const sessions = exams.filter((e) => e.examGroupId === g.id).sort((a,b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
-    return `<article class="exam-group-card"><div class="exam-group-top"><span class="muted">${esc(g.type)} · ${g.startDate.slice(0,4)}年</span><span class="badge ${g.endDate < today ? "badge-pending" : "badge-done"}">${g.endDate < today ? "終了" : g.startDate <= today ? "実施中" : countdownText(daysUntil(g.startDate))}</span></div><h2>${esc(g.name)}</h2><p class="muted">${fmtDate(g.startDate)}${g.startDate !== g.endDate ? "〜" + fmtDate(g.endDate) : ""}</p><div class="exam-metrics"><div><span>準備の実績</span><strong>${durationText(total.actual)}</strong></div><div><span>予定時間</span><strong>${durationText(total.planned)}</strong></div><div><span>学習予定</span><strong>${total.done} / ${total.count}件</strong></div></div><div class="exam-group-actions"><button class="btn btn-primary" onclick="viewExamHours('${g.id}')">統計を見る</button><button class="btn" onclick="viewExamSchedules('${g.id}')">学習予定</button><button class="btn btn-quiet" onclick="openModal('examgroup',examGroups.find(g=>g.id==='${g.id}'))">編集</button></div><details class="exam-sessions"><summary>教科別の日程 (${sessions.length}件)</summary>${sessions.map(examSessionCard).join("")}<button class="btn" onclick="openModal('exam',{examGroupId:'${g.id}',date:'${g.startDate}'})">＋ 教科の日程</button></details></article>`;
+    return `<article class="exam-group-card"><div class="exam-group-top"><span class="muted">${esc(g.type)} · ${g.startDate.slice(0,4)}年</span><span class="badge ${g.endDate < today ? "badge-pending" : "badge-done"}">${g.endDate < today ? "終了" : g.startDate <= today ? "実施中" : countdownText(daysUntil(g.startDate))}</span></div><h2>${esc(g.name)}</h2><p class="muted">${fmtDate(g.startDate)}${g.startDate !== g.endDate ? "〜" + fmtDate(g.endDate) : ""}</p><div class="exam-metrics"><div><span>準備の実績</span><strong>${durationText(total.actual)}</strong></div><div><span>予定時間</span><strong>${durationText(total.planned)}</strong></div><div><span>学習予定</span><strong>${total.done} / ${total.count}件</strong></div></div><div class="exam-group-actions"><button class="btn btn-tonal" onclick="viewExamSchedules('${g.id}')">学習予定</button><button class="btn" onclick="viewExamHours('${g.id}')">統計</button><button class="btn btn-quiet" onclick="openModal('examgroup',examGroups.find(g=>g.id==='${g.id}'))">編集</button></div><details class="exam-sessions"><summary>教科別の日程 (${sessions.length}件)</summary>${sessions.map(examSessionCard).join("")}<button class="btn" onclick="openModal('exam',{examGroupId:'${g.id}',date:'${g.startDate}'})">＋ 教科の日程</button></details></article>`;
   }).join("") : emptyState("考査・模試を1回ずつ登録して、準備を分けて管理しよう。", "試験を登録", "openModal('examgroup')");
   const unassigned = exams.filter((e) => !e.examGroupId), studyCount = schedules.filter((s) => !s.examGroupId).length;
   document.getElementById("unassigned-exams").innerHTML = `<h2 class="section-title">試験未指定の記録</h2><p class="muted">学習 ${studyCount}件 / 教科別日程 ${unassigned.length}件。以前の記録はそのまま残しています。編集画面で対象の試験を選べます。</p><button class="btn" onclick="viewExamSchedules('unassigned')">未指定の学習を見る</button>${unassigned.length ? `<details class="exam-sessions"><summary>未指定の日程を見る</summary>${unassigned.map(examSessionCard).join("")}</details>` : ""}`;
@@ -569,6 +585,8 @@ function renderSubjects() {
           .join("")
       : `<tr class="empty-row"><td colspan="6" class="empty-cell"><div class="empty"><p>教科がありません</p></div></td></tr>`;
   }
+  const cards = document.getElementById("subjects-list");
+  if (cards) cards.innerHTML = subjects.length ? subjects.map((s,i) => `<article class="subject-row"><span class="subject-dot" style="background:${s.color}"></span><strong>${esc(s.name)}</strong><div class="subject-row-actions"><button class="btn btn-quiet" aria-label="${esc(s.name)}を上へ" onclick="moveSubject(${i},-1)" ${i===0?'disabled':''}>上</button><button class="btn btn-quiet" aria-label="${esc(s.name)}を下へ" onclick="moveSubject(${i},1)" ${i===subjects.length-1?'disabled':''}>下</button><button class="icon-button" aria-label="${esc(s.name)}を編集" onclick="editSubject('${s.id}')">${appIcon('edit')}</button></div></article>`).join('') : '<p class="muted">教科がありません。追加から登録してください。</p>';
   const rows = buildRows();
   const t1 = document.getElementById("subjects-table");
   if (t1) t1.innerHTML = rows;
@@ -627,12 +645,12 @@ function renderHours() {
   const inRange = invalidRange ? [] : filterByPeriod(StudyModel.forExam(schedules, groupId), range);
   const total = StudyModel.totals(inRange);
   document.getElementById("hours-context").textContent = invalidRange ? "終了日は開始日以降を選んでください。" : `${groupId ? groupId === "unassigned" ? "試験未指定の学習" : groupName(groupId) : "すべての学習"} · ${inRange.length}件の記録（対象の試験と期間の両方で絞り込み）`;
-  document.getElementById("hours-stats").innerHTML = `<div class="stat-card"><div class="stat-label">実績時間</div><div class="stat-value">${durationText(total.actual)}</div></div><div class="stat-card"><div class="stat-label">予定時間</div><div class="stat-value">${durationText(total.planned)}</div></div><div class="stat-card"><div class="stat-label">完了した予定</div><div class="stat-value">${total.done}<span class="stat-unit"> / ${total.count}件</span></div></div>`;
+  document.getElementById("hours-stats").innerHTML = `<div class="stat-card"><div class="stat-label">勉強した時間</div><div class="stat-value">${durationText(total.actual)}</div></div><div class="stat-card"><div class="stat-label">予定時間</div><div class="stat-value">${durationText(total.planned)}</div></div><div class="stat-card"><div class="stat-label">完了した予定</div><div class="stat-value">${total.done}<span class="stat-unit"> / ${total.count}件</span></div></div>`;
   const rows = subjects.map((subject) => ({ subject, ...StudyModel.totals(inRange.filter((s) => s.subjectId === subject.id)) }));
   const unknown = inRange.filter((s) => !subjects.some((subject) => subject.id === s.subjectId));
   if (unknown.length) rows.push({ subject: {name:"削除された教科", color:"#68736c"}, ...StudyModel.totals(unknown) });
   const max = Math.max(...rows.map((r) => Math.max(r.actual, r.planned)), 0.1);
-  document.getElementById("hours-list").innerHTML = inRange.length ? rows.filter((r) => r.count).map((r) => `<div class="hours-row"><div class="hours-row-title"><strong>${esc(r.subject.name)}</strong><span>${r.count}件</span></div>${hoursMode !== "planned" ? `<div class="hours-measure"><span>実績</span><div class="hours-track"><div style="width:${r.actual/max*100}%;background:${r.subject.color}"></div></div><strong>${durationText(r.actual)}</strong></div>` : ""}${hoursMode !== "actual" ? `<div class="hours-measure"><span>予定</span><div class="hours-track"><div style="width:${r.planned/max*100}%;background:${r.subject.color};opacity:.5"></div></div><strong>${durationText(r.planned)}</strong></div>` : ""}</div>`).join("") : '<p class="empty-state">この条件の学習記録はまだありません。</p>';
+  document.getElementById("hours-list").innerHTML = inRange.length ? rows.map((r) => `<div class="hours-row"><div class="hours-row-title"><strong>${esc(r.subject.name)}</strong><span>${r.count}件</span></div>${hoursMode !== "planned" ? `<div class="hours-measure"><span>実績</span><div class="hours-track"><div style="width:${r.actual/max*100}%;background:var(--accent)"></div></div><strong>${durationText(r.actual)}</strong></div>` : ""}${hoursMode !== "actual" ? `<div class="hours-measure"><span>予定</span><div class="hours-track"><div style="width:${r.planned/max*100}%;background:var(--border2)"></div></div><strong>${durationText(r.planned)}</strong></div>` : ""}</div>`).join("") : '<p class="empty-state">この条件の学習記録はまだありません。</p>';
 }
 
 // ── Focus mode ────────────────────────────────────────
@@ -666,7 +684,7 @@ function startScheduleFocus(id) {
   if (!s) return;
   showView("focus");
   document.getElementById("focus-schedule-link").value = id;
-  document.getElementById("focus-minutes").value = Math.min(300, Math.max(1, Math.round(Number(s.duration) * 60)));
+  document.getElementById("focus-minutes").value = Math.min(1440, Math.max(1, Math.round(Number(s.duration) * 60)));
   syncFocusLink();
   startFocus();
 }
@@ -684,8 +702,8 @@ function updateFocusMinutes() {
 function startFocus() {
   if (document.getElementById("focus-active").style.display !== "none") return;
   const minutes = Number(document.getElementById("focus-minutes").value);
-  if (!subjects.some((s) => s.id === document.getElementById("focus-subject").value)) { toast("先に設定で教科を登録してください"); return; }
-  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 300) { toast("タイマーは1〜300分で設定してください"); return; }
+  if (!subjects.some((s) => s.id === document.getElementById("focus-subject").value)) { toast("先に「その他 → 教科」で教科を登録してください"); return; }
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) { toast("タイマーは1〜1440分で設定してください"); return; }
   syncFocusLink();
   focusExamGroupId = document.getElementById("focus-exam-group").value;
   focusSessionStart = Date.now();
@@ -923,9 +941,12 @@ function deleteExam(id) {
 }
 function deleteSubject(id) {
   if (focusSubjectId === id && document.getElementById("focus-active").style.display !== "none") { toast("タイマーを終了してから教科を削除してください"); return; }
+  if (schedules.some(s => s.subjectId === id)) { toast("学習記録に使われている教科は削除できません"); return; }
+  if (subjects.length <= 1) { toast("教科を1つ以上残してください"); return; }
   if (!confirm("この教科を削除しますか？")) return;
   subjects = subjects.filter((s) => s.id !== id);
   save("sl_subjects", subjects);
+  closeModal();
   render();
 }
 function changeWeek(d) {
@@ -982,7 +1003,7 @@ function openModal(type, data = {}) {
     const color = data.color || COLORS[subjects.length % COLORS.length];
     body.innerHTML = modalLayout(data.id ? "教科を編集" : "教科を追加",
       formField("m-sname", "教科名", `<input id="m-sname" value="${esc(data.name)}" required maxlength="100" placeholder="例：数学I・A">`, true)
-      + formField("m-scolor", "教科の色", `<div class="subject-colors">${COLORS.map((c) => `<button type="button" class="color-pick ${c === color ? "selected" : ""}" aria-label="色 ${c}" aria-pressed="${c === color}" style="background:${c}" onclick="pickColor(this,'${c}')"></button>`).join("")}</div><input type="color" id="m-scolor" value="${color}" aria-label="カスタム色">`, true), `saveSubject('${data.id || ""}')`);
+      + formField("m-scolor", "教科の色", `<div class="subject-colors">${COLORS.map((c) => `<button type="button" class="color-pick ${c === color ? "selected" : ""}" aria-label="色 ${c}" aria-pressed="${c === color}" style="background:${c}" onclick="pickColor(this,'${c}')"></button>`).join("")}</div><input type="color" id="m-scolor" value="${color}" aria-label="カスタム色">`, true), `saveSubject('${data.id || ""}')`, data.id ? `<button type="button" class="btn btn-danger" onclick="deleteSubject('${data.id}')">削除</button>` : "");
   }
   activateModal();
 }
@@ -1035,7 +1056,7 @@ function saveSchedule(id) {
   const minutes = Number(document.getElementById("m-duration").value), actualVal = document.getElementById("m-actual").value;
   const old = schedules.find((s) => s.id === id);
   if (focusSchedId === id && document.getElementById("focus-active").style.display !== "none") return formError("タイマーを終了してから予定を編集してください");
-  if (!subjects.some((s) => s.id === document.getElementById("m-subjectId").value)) return formError("先に設定で教科を登録してください");
+  if (!subjects.some((s) => s.id === document.getElementById("m-subjectId").value)) return formError("先に「その他 → 教科」で教科を登録してください");
   if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440) return formError("予定時間は1〜1440分で入力してください");
   if (actualVal !== "" && (!Number.isFinite(Number(actualVal)) || Number(actualVal) < 0)) return formError("実績時間は0分以上で入力してください");
   const datetime = document.getElementById("m-datetime").value;
