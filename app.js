@@ -304,7 +304,7 @@ function renderSchedule() {
     + (past.length ? `<details class="past-archive"><summary>過去の予定 · ${past.reduce((n, [,items]) => n + items.length, 0)}件</summary>${past.reverse().map(([date, items]) => groupHtml(date, items)).join("")}</details>` : "") : emptyState("この条件の予定はありません。");
 }
 let ttMode = "list";
-function setTTMode(mode) { ttMode = mode; applyTTMode(); }
+function setTTMode(mode) { ttMode = mode; applyTTMode(); layoutTimetableBlocks(); }
 function applyTTMode() {
   const mobile = window.innerWidth <= 700, grid = !mobile || ttMode === "grid";
   document.getElementById("timetable-grid").style.display = grid ? "" : "none";
@@ -324,6 +324,9 @@ function renderTimetable() {
     d.setDate(base.getDate() + i);
     return d;
   });
+  const previousWrap = document.querySelector("#timetable-grid .tt2-wrap");
+  const sameWeek = previousWrap?.dataset.week === StudyModel.localDate(base);
+  const scrollPosition = sameWeek ? { top: previousWrap.scrollTop, left: previousWrap.scrollLeft } : null;
 
   document.getElementById("week-label").textContent =
     `${dates[0].getMonth() + 1}/${dates[0].getDate()} 〜 ${dates[6].getMonth() + 1}/${dates[6].getDate()}`;
@@ -356,7 +359,7 @@ function renderTimetable() {
     if (e.startTime)
       minHour = Math.min(minHour, parseInt(e.startTime.split(":")[0]));
     if (e.endTime)
-      maxHour = Math.max(maxHour, Math.ceil(parseInt(e.endTime.split(":")[0])));
+      maxHour = Math.max(maxHour, Math.ceil(parseInt(e.endTime.split(":")[0]) + parseInt(e.endTime.split(":")[1]) / 60));
   });
 
   const START_HOUR = Math.max(0, minHour);
@@ -405,36 +408,27 @@ function renderTimetable() {
 
     dayExams.forEach((e) => {
       const matchedSubj = subjects.find((s) => s.name === e.subject);
-      const color = matchedSubj ? matchedSubj.color : "var(--purple)";
-      const sMins = e.startTime
-        ? parseInt(e.startTime.split(":")[0]) * 60 +
-          parseInt(e.startTime.split(":")[1])
-        : START_HOUR * 60;
-      const eMins = e.endTime
-        ? parseInt(e.endTime.split(":")[0]) * 60 +
-          parseInt(e.endTime.split(":")[1])
-        : sMins + 60;
-      const top = Math.max(0, ((sMins - START_HOUR * 60) / 60) * ROW_H);
-      const height = Math.max(ROW_H * 0.4, ((eMins - sMins) / 60) * ROW_H);
-      blocksHtml += `<div class="tt2-block tt2-exam-block" style="top:${top}px;height:${height}px;border-color:${color};color:${color}" title="${esc(e.subject)}">
+      const color = matchedSubj ? matchedSubj.color : "#657078";
+      const startMinutes = e.startTime ? e.startTime.split(":").reduce((h, m) => Number(h) * 60 + Number(m)) : START_HOUR * 60;
+      const endMinutes = e.endTime ? e.endTime.split(":").reduce((h, m) => Number(h) * 60 + Number(m)) : startMinutes + 60;
+      const top = Math.max(0, (startMinutes - START_HOUR * 60) / 60 * ROW_H);
+      const height = Math.max(56, (endMinutes - startMinutes) / 60 * ROW_H);
+      blocksHtml += `<button type="button" class="tt2-block tt2-exam-block" data-exam-id="${esc(e.id)}" data-top="${top}" style="top:${top}px;min-height:${height}px;--subject-color:${color}">
         <span class="tt2-block-name">${esc(e.subject)}</span>
-        <span class="tt2-block-time">${e.startTime || ""}${e.endTime ? "〜" + e.endTime : ""}</span>
-      </div>`;
+        <span class="tt2-block-time">試験 ${e.startTime || "時刻未指定"}${e.endTime ? "〜" + e.endTime : ""}</span>
+      </button>`;
     });
 
     daySchedules.forEach((s) => {
       const subj = subjectById(s.subjectId);
       const top = Math.max(0, toY(s.datetime));
-      const height = Math.max(ROW_H * 0.4, durToH(s.duration));
-      const alpha =
-        s.status === "done" ? "cc" : s.status === "miss" ? "55" : "";
+      const height = Math.max(56, durToH(s.duration));
       const sd = new Date(s.datetime);
       const timeStr = `${String(sd.getHours()).padStart(2, "0")}:${String(sd.getMinutes()).padStart(2, "0")}`;
-      blocksHtml += `<div class="tt2-block" style="top:${top}px;height:${height}px;background:${subj.color}${alpha}" title="${esc(subj.name)}: ${esc(s.content || "")} (${timeStr}〜)">
+      blocksHtml += `<button type="button" class="tt2-block" data-schedule-id="${esc(s.id)}" data-top="${top}" style="top:${top}px;min-height:${height}px;--subject-color:${subj.color}" title="${esc(s.content || "")}">
         <span class="tt2-block-name">${esc(subj.name)}</span>
-        <span class="tt2-block-time">${timeStr}</span>
-        ${s.content ? `<span class="tt2-block-content">${esc(s.content)}</span>` : ""}
-      </div>`;
+        <span class="tt2-block-time">${timeStr} · ${durationText(s.duration)}${s.status === "done" ? " · 完了" : s.status === "miss" ? " · 未実施" : ""}</span>
+      </button>`;
     });
 
     colsHtml += `<div class="tt2-col${isToday ? " tt2-today" : ""}">
@@ -444,7 +438,7 @@ function renderTimetable() {
   });
 
   document.getElementById("timetable-grid").innerHTML = `
-    <div class="tt2-wrap">
+    <div class="tt2-wrap" data-week="${StudyModel.localDate(base)}">
       <div class="tt2-axis" style="padding-top:${HEADER_H}px">
         <div class="tt2-axis-inner" style="position:relative;height:${GRID_H}px">${axisHtml}</div>
       </div>
@@ -453,7 +447,52 @@ function renderTimetable() {
 
   renderMobileDayList(base, now);
   applyTTMode();
+  layoutTimetableBlocks();
+  if (scrollPosition) {
+    const wrap = document.querySelector("#timetable-grid .tt2-wrap");
+    wrap.scrollTop = scrollPosition.top;
+    wrap.scrollLeft = scrollPosition.left;
+  }
 }
+
+// Keep each label readable without moving its start time. Expanded short events get
+// separate horizontal lanes when they collide, including events of different types.
+function layoutTimetableBlocks() {
+  const grid = document.getElementById("timetable-grid");
+  if (!grid || !grid.getClientRects().length) return;
+  const columns = [...grid.querySelectorAll(".tt2-col")];
+  columns.forEach((column) => {
+    column.style.minWidth = "160px";
+    const body = column.querySelector(".tt2-col-body");
+    const blocks = [...body.querySelectorAll(".tt2-block")].sort((a, b) => Number(a.dataset.top) - Number(b.dataset.top));
+    const lanes = [];
+    blocks.forEach((block) => {
+      block.style.width = "156px";
+      block.style.right = "auto";
+      const top = Number(block.dataset.top);
+      const height = block.getBoundingClientRect().height;
+      let lane = lanes.findIndex((end) => end + 4 <= top);
+      if (lane < 0) lane = lanes.length;
+      lanes[lane] = top + height;
+      block.dataset.lane = String(lane);
+      block.style.left = `${2 + lane * 160}px`;
+      block.onclick = () => {
+        if (block.dataset.examId) editExam(block.dataset.examId);
+        else {
+          const item = schedules.find((s) => s.id === block.dataset.scheduleId);
+          if (item) openModal("schedule", item);
+        }
+      };
+    });
+    column.style.minWidth = `${Math.max(1, lanes.length) * 160}px`;
+  });
+  // Events at 23:59 still need space for the complete label below the last tick.
+  const bodies = [...grid.querySelectorAll(".tt2-col-body")];
+  const baseHeight = grid.querySelector(".tt2-axis-inner").offsetHeight;
+  const bottom = Math.max(baseHeight, ...bodies.flatMap((body) => [...body.querySelectorAll(".tt2-block")].map((block) => Number(block.dataset.top) + block.offsetHeight + 8)));
+  bodies.forEach((body) => body.style.height = `${bottom}px`);
+}
+document.fonts.ready.then(() => layoutTimetableBlocks());
 
 function renderMobileDayList(base, now) {
   const container = document.getElementById("mobile-day-list");

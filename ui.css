@@ -20,7 +20,14 @@
     --info: #b4b4bc; --info-bg: #242428; --purple: #b4b4bc; --purple-bg: #242428;
   }
 }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif; font-size: 15px; line-height: 1.55; min-height: 100dvh; }
+@font-face {
+  font-family: "StudyCoPi Japanese";
+  src: url("assets/fonts/noto_sans_jp.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+body { font-family: "StudyCoPi Japanese", "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif; font-size: 15px; line-height: 1.55; min-height: 100dvh; }
 button,input,select,textarea { font: inherit; }
 button { touch-action: manipulation; cursor: pointer; }
 button:disabled { opacity: .4; cursor: default; }
@@ -210,8 +217,14 @@ body[data-view="focus"] .running-focus { display: none; }
 .tt-mode-buttons .btn { flex: 1; }
 .tt-mode-buttons .btn[aria-pressed="true"] { background: var(--accent); color: var(--primary-text); border-color: var(--accent); }
 .tt2-wrap { max-height: 70dvh; }
-.tt2-col { min-width: 84px; }
-.tt2-block { box-shadow: none; }
+.tt2-axis { position: sticky; left: 0; z-index: 4; }
+.tt2-col { min-width: 160px; }
+.tt2-block { box-shadow: none; min-height: 56px; height: auto; padding: 8px; gap: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-align: left; font: inherit; }
+.tt2-block-name { white-space: normal; overflow: visible; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+.tt2-block-name::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 5px; background: var(--subject-color); border-radius: 50%; vertical-align: middle; }
+.tt2-block-time { font-size: 11px; line-height: 1.6; opacity: 1; color: var(--text2); white-space: normal; }
+.tt2-block:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; z-index: 2; }
+.tt2-col-header { position: sticky; top: 0; z-index: 3; }
 .tt2-col-header { font-size: 13px; }
 .tt2-block-content { display: block; }
 .day-selector { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; margin-bottom: 14px; }
