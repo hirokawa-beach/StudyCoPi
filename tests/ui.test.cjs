@@ -6,14 +6,14 @@ const path = require('node:path');
 const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
 (async () => {
   const browser = await chromium.launch({headless:true,channel:process.env.STUDYCOPI_BROWSER_CHANNEL || 'chrome'});
-  const context = await browser.newContext({viewport:{width:390,height:844},timezoneId:'Asia/Tokyo',colorScheme:'light'});
+  const context = await browser.newContext({viewport:{width:390,height:844},timezoneId:'Asia/Tokyo',colorScheme:'light',isMobile:true,hasTouch:true});
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('dialog', (d) => d.accept());
   await page.clock.install({time:new Date('2026-10-03T12:00:00+09:00')});
   await page.goto(url);
-  await page.waitForSelector('#dash-next h2');
+  await page.waitForSelector('.today-summary strong');
   const visible = async (selector) => assert.equal(await page.locator(selector).isVisible(), true, selector);
   const save = async () => page.locator('#modal-form button[type=submit]').click();
   const evalApp = async (source) => page.evaluate((source) => eval(source), source);
@@ -57,12 +57,49 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
   await evalApp(`openRecord('${s1}')`);
   await page.locator('label:has(input[value=partial])').click();
   await page.locator('#record-minutes').fill('20'); await save();
+
   assert.equal(await evalApp(`StudyModel.totals(StudyModel.forExam(schedules,'${first}')).actual`),1/3);
-  await page.locator('#toast-undo').click();
+  await page.locator('#toast-undo').tap();
   assert.equal(await evalApp(`schedules.find(s=>s.id==='${s1}').status`),'pending');
   await evalApp(`openRecord('${s1}')`);
   await page.locator('label:has(input[value=partial])').click();
   await page.locator('#record-minutes').fill('20'); await save();
+
+  // A single tap records completion; undo preserves the existing partial time.
+  await page.locator('.mobile-bottom-nav button[data-view=dashboard]').tap();
+  for (const selector of ['#quick-add','.study-check','.study-actions .btn','.mobile-bottom-nav button']) {
+    for (const target of await page.locator(selector).all()) {
+      const bounds = await target.boundingBox();
+      if (bounds) assert.ok(bounds.width >= 44 && bounds.height >= 44, `touch target ${selector}`);
+    }
+  }
+  const rowBounds = await page.locator('#dash-mobile-list .study-card').first().boundingBox();
+  assert.ok(rowBounds.height <= 145, 'compact study rows on a phone');
+  const firstRow = page.locator('#dash-mobile-list .study-card').filter({hasText:'問題集 p.24〜28'});
+  await firstRow.locator('.study-check').tap();
+  assert.equal(await evalApp(`schedules.find(s=>s.id==='${s1}').status`),'done');
+  assert.equal(await evalApp(`schedules.find(s=>s.id==='${s1}').actualDuration`),1/3);
+  assert.equal(await page.locator('#modal-backdrop').isVisible(),false);
+  await page.locator('#toast-undo').tap();
+  assert.equal(await evalApp(`schedules.find(s=>s.id==='${s1}').status`),'partial');
+  const secondRow = page.locator('#dash-mobile-list .study-card').filter({hasText:'模試の過去問'});
+  await secondRow.locator('.study-check').tap();
+  assert.equal(await evalApp(`schedules.find(s=>s.id==='${s2}').actualDuration`),1);
+  await page.locator('#toast-undo').tap();
+  assert.equal(await evalApp(`schedules.find(s=>s.id==='${s2}').actualDuration`),undefined);
+  await page.locator('.mobile-bottom-nav button[data-view=examgroups]').tap();
+  await page.locator('#quick-add').tap();
+  await visible('#m-group-name');
+  await page.locator('.modal-header button').tap();
+
+  await page.locator('.mobile-bottom-nav button[data-view=schedule]').tap();
+  assert.equal(await page.locator('#filter-exam').isVisible(),false);
+  await page.locator('#schedule-filters summary').tap();
+  await visible('#filter-exam');
+  await page.locator('#filter-exam').selectOption(first);
+  assert.equal(await page.locator('#schedule-mobile-list .study-card').count(),1);
+  await page.locator('#filter-exam').selectOption('');
+  assert.equal(await evalApp(`StudyModel.totals(StudyModel.forExam(schedules,'${first}')).actual`),1/3);
 
   await evalApp(`viewExamHours('${first}')`);
   assert.match(await page.locator('#hours-stats').innerText(),/20分/);
@@ -78,10 +115,18 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
   await evalApp(`startScheduleFocus('${s1}')`);
   assert.equal(await page.locator('#focus-exam-group').inputValue(),first);
   assert.equal(await page.locator('#focus-exam-group').isDisabled(),true);
+  await page.locator('.mobile-bottom-nav button[data-view=dashboard]').tap();
+  await visible('#running-focus');
+  await page.locator('#dash-mobile-list .study-card').filter({hasText:'問題集 p.24〜28'}).locator('.study-check').tap();
+  assert.equal(await evalApp(`schedules.find(s=>s.id==='${s1}').status`),'partial');
+  await page.locator('#running-focus').tap();
+  await visible('#focus-active');
   await page.clock.fastForward(10*60*1000);
   await page.locator('#focus-pause-btn').click();
+  assert.equal(await page.locator('#running-focus-label').textContent(),'一時停止中');
   await page.clock.fastForward(5*60*1000);
   await evalApp('stopFocus()');
+  assert.equal(await page.locator('#running-focus').isVisible(),false);
   const accumulated = await evalApp(`schedules.find(s=>s.id==='${s1}').actualDuration`);
   assert.ok(Math.abs(accumulated-.5)<.02,`accumulated ${accumulated}`);
   assert.equal(await evalApp(`schedules.find(s=>s.id==='${s1}').examGroupId`),first);
@@ -150,7 +195,7 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
   await page.emulateMedia({colorScheme:'dark',reducedMotion:'reduce'});
   await evalApp("showView('examgroups')");
   await page.screenshot({path:'.artifacts/exams-dark-mobile.png',fullPage:true});
-  await page.reload(); await page.waitForSelector('#dash-next h2');
+  await page.reload(); await page.waitForSelector('.today-summary strong');
   assert.equal(await evalApp('examGroups.length'),2);
   const legacy = {subjects:backup.subjects,schedules:backup.schedules.map(({examGroupId,...s})=>s),exams:backup.exams.map(({examGroupId,...e})=>e)};
   await page.locator('#import-file').setInputFiles({name:'legacy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(legacy))});
@@ -163,7 +208,7 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
   const fallback = await unsupported.newPage();
   fallback.on('pageerror', (e) => errors.push(e.message));
   await fallback.goto(url);
-  await fallback.waitForSelector('#dash-next h2');
+  await fallback.waitForSelector('.today-summary strong');
   await fallback.evaluate(() => { showView('focus'); document.getElementById('focus-minutes').value = 1; startFocus(); focusStart = Date.now()-120000; tickFocus(); stopFocus(); });
   assert.equal(await fallback.evaluate(() => schedules.length),1);
   assert.equal(await fallback.evaluate(() => Math.round(schedules[0].actualDuration*60)),1);

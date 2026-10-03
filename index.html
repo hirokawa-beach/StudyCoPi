@@ -7,7 +7,7 @@
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#285943">
+<meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="StudyCoPi">
@@ -30,10 +30,9 @@
 <div class="mobile-header">
   <div>
     <h1>StudyCoPi</h1>
-    <span>勉強スケジュール管理</span>
   </div>
   <div style="display:flex;gap:8px;align-items:center;">
-    <button type="button" class="btn btn-primary" onclick="openModal('schedule')">＋ 予定</button>
+    <button id="quick-add" type="button" class="btn btn-primary" onclick="quickAdd()">＋ 追加</button>
   </div>
 </div>
 <div class="app">
@@ -70,18 +69,18 @@
     <div class="view active" id="view-dashboard">
       <div class="page-heading"><div><div class="view-title">今日の学習</div><div class="view-subtitle" id="today-label"></div></div><button class="btn btn-primary desktop-add" onclick="openModal('schedule')">＋ 予定を追加</button></div>
       <div id="dash-next"></div>
-      <div class="home-columns"><section><div class="section-header"><h2 class="section-title">今日の予定</h2><button class="btn btn-sm" onclick="showView('schedule')">すべて見る</button></div><div id="dash-mobile-list" class="study-list"></div></section>
-      <aside class="home-summary"><h2 class="section-title">今日の積み重ね</h2><div class="stats-grid" id="dash-stats"></div><div id="dash-exam-countdown"></div><div id="dash-week"></div></aside></div>
+      <div class="home-summary"><div id="dash-stats" class="today-summary"></div></div>
+      <section><div class="section-header"><h2 class="section-title">予定</h2><button class="btn btn-quiet" onclick="showView('focus')">タイマー</button></div><div id="dash-mobile-list" class="study-list"></div></section>
+      <div id="dash-exam-countdown"></div><div id="dash-week"></div>
     </div>
 
     <!-- Schedule list -->
     <div class="view" id="view-schedule">
       <div class="view-title">スケジュール一覧</div>
       <div class="view-subtitle">登録した予定と実績</div>
-      <div class="btn-row">
-        <button class="btn btn-primary" onclick="openModal('schedule')">＋ 追加</button>
-        <button class="btn" onclick="showView('timetable')">週間表示</button>
-        <button class="btn" id="toggle-exam-btn" onclick="toggleExamVisibility()">考査を非表示</button>
+      <div class="schedule-toolbar"><button class="btn" onclick="showView('timetable')">週間表示</button><button class="btn btn-primary desktop-add" onclick="openModal('schedule')">＋ 予定</button></div>
+      <details class="filter-panel" id="schedule-filters"><summary>絞り込み <span id="filter-count"></span></summary><div class="btn-row">
+        <button class="btn" id="toggle-exam-btn" onclick="toggleExamVisibility()">試験日程を非表示</button>
         <select id="filter-subject" aria-label="教科で絞り込む" onchange="renderSchedule()" style="width:auto">
           <option value="">すべての教科</option>
         </select>
@@ -93,7 +92,7 @@
           <option value="pending">未記録</option>
         </select>
         <label class="filter-field">対象の試験<select id="filter-exam" onchange="renderSchedule()"></select></label>
-      </div>
+      </div></details>
       <div id="schedule-summary" class="list-summary" aria-live="polite"></div>
       <div class="study-list" id="schedule-mobile-list"></div>
     </div>
@@ -213,18 +212,10 @@
       <div class="focus-active" id="focus-active" style="display:none">
         <div class="focus-subject-label" id="focus-active-subject"></div>
         <div class="focus-timer-display" id="focus-timer-display">00:00</div>
-        <div class="focus-progress-ring">
-          <svg viewBox="0 0 120 120" width="160" height="160">
-            <circle cx="60" cy="60" r="54" fill="none" stroke="var(--border)" stroke-width="6"/>
-            <circle cx="60" cy="60" r="54" fill="none" stroke="var(--accent)" stroke-width="6"
-              stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3"
-              id="focus-ring" transform="rotate(-90 60 60)"/>
-          </svg>
-        </div>
         <div class="focus-elapsed" id="focus-elapsed">経過: 0分</div>
         <div class="focus-btn-row">
-          <button class="btn" onclick="pauseFocus()" id="focus-pause-btn">⏸ 一時停止</button>
-          <button class="btn btn-danger" onclick="stopFocus()">⏹ 終了・記録</button>
+          <button class="btn" onclick="pauseFocus()" id="focus-pause-btn">一時停止</button>
+          <button class="btn btn-danger" onclick="stopFocus()">終了・記録</button>
         </div>
         <button class="btn btn-sm" style="margin-top:8px;opacity:0.6" onclick="enterFullscreen()"> 全画面</button>
       </div>
@@ -235,8 +226,8 @@
           <div class="focus-fs-timer" id="focus-fs-timer">00:00</div>
           <div class="focus-fs-elapsed" id="focus-fs-elapsed"></div>
           <div style="display:flex;gap:12px;margin-top:32px">
-            <button class="btn" id="focus-fs-pause-btn" style="flex:1;justify-content:center;padding:12px" onclick="pauseFocus()">⏸ 一時停止</button>
-            <button class="btn btn-danger" style="flex:1;justify-content:center;padding:12px" onclick="stopFocus()">⏹ 終了</button>
+            <button class="btn" id="focus-fs-pause-btn" style="flex:1;justify-content:center;padding:12px" onclick="pauseFocus()">一時停止</button>
+            <button class="btn btn-danger" style="flex:1;justify-content:center;padding:12px" onclick="stopFocus()">終了</button>
           </div>
           <p style="margin-top:20px;font-size:12px;opacity:0.5">画面外をタップすると通常表示に戻ります</p>
         </div>
@@ -251,13 +242,13 @@
       <div class="card data-card">
         <div class="section-title">バックアップをダウンロード</div>
         <p class="data-desc">教科・スケジュール・考査のデータを JSON ファイルとして保存します。機種変更やブラウザを変えるときに使えます。</p>
-        <button type="button" class="btn btn-primary" onclick="exportData()">⬇ ダウンロード</button>
+        <button type="button" class="btn btn-primary" onclick="exportData()">ダウンロード</button>
       </div>
       <div class="card data-card">
         <div class="section-title">バックアップから復元</div>
         <p class="data-desc">以前ダウンロードしたファイルを読み込みます。現在のデータは上書きされます。</p>
         <input type="file" id="import-file" accept=".json,application/json" hidden onchange="importData(this)">
-        <button type="button" class="btn" onclick="document.getElementById('import-file').click()">⬆ ファイルを選択</button>
+        <button type="button" class="btn" onclick="document.getElementById('import-file').click()">ファイルを選択</button>
       </div>
     </div>
 
@@ -271,6 +262,7 @@
     <section id="view-more" class="view">
       <h1 class="view-title">その他</h1><p class="view-subtitle">試験の準備や、アプリの設定はこちらから</p>
       <div class="more-menu">
+        <button onclick="showView('focus')"><strong>集中タイマー</strong><span>予定がなくても勉強を記録 →</span></button>
         <button onclick="showView('examgroups')"><strong>試験ごとの管理</strong><span>考査・模試の登録と振り返り →</span></button>
         <button onclick="showView('timetable')"><strong>週間タイムテーブル</strong><span>1週間の予定を確認 →</span></button>
         <button onclick="showView('settings')"><strong>設定</strong><span>教科・通知・教科別の試験日程 →</span></button>
@@ -313,7 +305,7 @@
         <div class="notif-settings-grid" id="notif-settings-grid">
           <label class="notif-toggle-row">
             <div class="notif-toggle-info">
-              <span class="notif-toggle-title">⏰ タイマー終了</span>
+              <span class="notif-toggle-title">タイマー終了</span>
               <span class="notif-toggle-desc">集中タイマーが0:00になったとき</span>
             </div>
             <input type="checkbox" id="notif-timer" class="notif-check" onchange="saveNotifSettings()">
@@ -329,7 +321,7 @@
 
           <label class="notif-toggle-row">
             <div class="notif-toggle-info">
-              <span class="notif-toggle-title">⏱ 予定のX分前</span>
+              <span class="notif-toggle-title">予定のX分前</span>
               <span class="notif-toggle-desc">スケジュール開始の前にリマインド</span>
             </div>
             <input type="checkbox" id="notif-schedule-pre" class="notif-check" onchange="saveNotifSettings()">
@@ -379,9 +371,9 @@
     <section id="view-help" class="view help-content">
       <h1 class="view-title">ヘルプ</h1><p class="view-subtitle">予定を立てる、勉強する、振り返る。</p>
       <h2>最初の準備</h2>
-      <ol><li>設定で教科を登録します。</li><li>「その他 → 試験ごとの管理」で、考査・模試を1回ずつ登録します。例：2026年の1学期中間考査、第2回模試。</li><li>試験カードの「教科別の日程」から、各教科の日時を追加できます。</li></ol>
+      <ol><li>設定で教科を登録します。</li><li>「試験」で、考査・模試を1回ずつ登録します。例：2026年の1学期中間考査、第2回模試。</li><li>試験の「教科別の日程」から、各教科の日時を追加できます。</li></ol>
       <h2>学習を記録する</h2>
-      <ol><li>「＋ 予定」で対象の試験、教科、日時、予定時間を選択。日常の学習は試験未指定でも登録できます。</li><li>予定カードの「開始」で、その予定に紐付いた集中タイマーが動きます。終了時の時間が実績に加算されます。</li><li>タイマーを使わなかった勉強は「記録」から、完了・一部・未実施と実績の合計時間を入力します。</li></ol>
+      <ol><li>画面上の「＋ 追加」で教科、対象の試験、日時、予定時間を選択。日常の学習は試験未指定でも登録できます。</li><li>予定の「開始」で、その予定に紐付いた集中タイマーが動きます。終了時の時間が実績に加算されます。別の画面に移動しても下部からタイマーに戻れます。</li><li>予定の左のチェックで完了を直接記録できます。実績が未記録のときは予定時間が入り、記録済みの実績時間は保持します。「記録」では完了・一部・未実施と実績の合計時間を入力できます。</li><li>教科や学習内容をタップすると予定を編集できます。</li></ol>
       <h2>試験ごとに振り返る</h2>
       <p>試験カードの「教科別の統計」で、その試験に紐付いた予定・実績を確認できます。「統計」では試験と集計期間を組み合わせて絞り込めます。一部だけ勉強した時間も実績に含まれます。以前の完了記録で実績時間が空欄の場合は、予定時間を実績として扱います。</p>
       <details><summary>以前の記録はどうなる？</summary><p>すべてそのまま残り、試験未指定として扱います。予定や教科別日程の編集から試験を選べます。日付だけで自動的に試験へ振り分けることはありません。</p></details>
@@ -405,10 +397,11 @@
 <nav class="mobile-bottom-nav" aria-label="メインメニュー">
   <button type="button" data-view="dashboard" onclick="showView('dashboard')"><span>今日</span></button>
   <button type="button" data-view="schedule" onclick="showView('schedule')"><span>予定</span></button>
-  <button type="button" data-view="focus" onclick="showView('focus')"><span>集中</span></button>
+  <button type="button" data-view="examgroups" onclick="showView('examgroups')"><span>試験</span></button>
   <button type="button" data-view="hours" onclick="showView('hours')"><span>統計</span></button>
   <button type="button" data-view="more" onclick="showView('more')"><span>その他</span></button>
 </nav>
+<button id="running-focus" class="running-focus" onclick="showView('focus')" hidden><span id="running-focus-label">勉強中</span><strong id="running-focus-time"></strong><span>タイマーに戻る →</span></button>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden><span id="toast-message"></span><button id="toast-undo" onclick="undoLastAction()" hidden>元に戻す</button></div>
 <script src="study-model.js"></script>
 <script src="app.js"></script>
