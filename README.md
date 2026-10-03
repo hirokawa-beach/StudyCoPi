@@ -1,6 +1,9 @@
 # StudyCoPi(スタディコパイ)
 あなたの勉強スケジュールを勉強時のCopilot(副操縦士)として、サポートするWebアプリです。
 
+Android版は [android](android/) にあります。Kotlin + Jetpack Composeで実装しています。
+Android Studioで開き、実行・ビルドする方法は [Android版のREADME](android/README.md) を参照してください。
+
 <お知らせとお願いと言い訳> <br>
 最新バージョンはv0.0.1で、不安定版です。<br>
 考査一週間前に作ろうと思い立ったので、ひとまずAIにすべてを委ねました。<br>

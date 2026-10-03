@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keep the supplied artwork intact and scale it within the adaptive icon safe area. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="11.111111%">
+    <bitmap android:src="@drawable/app_icon_art" android:gravity="fill" android:filter="true" />
+</inset>

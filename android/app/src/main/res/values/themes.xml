@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.StudyCoPi" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">@font/noto_sans_jp</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:colorAccent">#245D67</item>
+        <item name="android:windowBackground">#F5F7F7</item>
+    </style>
+</resources>
