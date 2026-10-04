@@ -215,3 +215,17 @@ progress::-moz-progress-bar { background:var(--accent); border-radius:4px; }
 .backup-reminder .btn-primary { width:auto; flex:1; }
 .backup-reminder .btn { white-space:nowrap; }
 .sound-toggle input { min-height:20px; accent-color:var(--accent); }
+
+/* About and scheduled waiting screen share the native app's spacing and controls. */
+.about-view > * { margin-bottom: 20px; }
+.about-view > img { display: block; border-radius: 16px; }
+.about-links { display: grid; gap: 12px; max-width: 520px; }
+.about-links .btn { white-space: normal; text-align: center; }
+.scheduled-focus-settings { margin-bottom: 20px; }
+.scheduled-focus-dialog { width: min(480px,calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; margin: auto; padding: 24px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text); }
+.scheduled-focus-dialog::backdrop { background: rgb(0 0 0 / .55); }
+.scheduled-focus-dialog > * { margin-bottom: 20px; }
+.scheduled-focus-dialog .btn { display: block; width: 100%; min-height: 52px; }
+.scheduled-focus-dialog .muted { font-size: 13px; margin-bottom: 0; }
+.scheduled-focus-subject { font-size: 24px; font-weight: 700; overflow-wrap: anywhere; }
+.scheduled-focus-time { padding: 24px 0; font-size: 40px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }

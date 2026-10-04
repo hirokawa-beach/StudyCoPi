@@ -877,7 +877,7 @@ function exportData() {
     version: 3,
     app: APP_NAME,
     exportedAt: new Date().toISOString(),
-    web: typeof webSound !== "undefined" ? {sound: webSound} : {},
+    web: typeof webSound !== "undefined" ? {sound: webSound, scheduledFocus: typeof scheduledFocusEnabled !== "undefined" && scheduledFocusEnabled} : {},
     android: load("sl_android_backup", undefined),
     subjects,
     schedules,
@@ -907,10 +907,12 @@ function importData(input) {
       const raw = JSON.parse(event.target.result);
       const data = StudyModel.validateBackup(raw);
       const sound = typeof validateWebSound === "function" ? validateWebSound(raw.web?.sound) : null;
+      const focusMode = typeof validateScheduledFocus === "function" ? validateScheduledFocus(raw.web?.scheduledFocus) : false;
       if (!confirm("現在のデータを上書きして復元します。よろしいですか？")) return;
       if (document.getElementById("focus-active").style.display !== "none") { toast("タイマーを終了してから復元してください"); return; }
       subjects = data.subjects; schedules = data.schedules; exams = data.exams; examGroups = data.examGroups;
       save("sl_subjects", subjects); save("sl_schedules", schedules); save("sl_exams", exams); save("sl_exam_groups", examGroups);
+      if (typeof setScheduledFocus === "function") { closeScheduledFocus(); setScheduledFocus(focusMode); }
       if (sound) { webSound = sound; save("sl_sound", sound); loadWebSoundUI(); }
       if (raw.android && typeof raw.android === "object" && !Array.isArray(raw.android)) save("sl_android_backup", raw.android); else localStorage.removeItem("sl_android_backup");
       render(); toast("データを復元しました");

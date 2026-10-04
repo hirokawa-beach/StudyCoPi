@@ -49,7 +49,9 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
     private fun run(action: suspend () -> Unit) { viewModelScope.launch {
         operations.withLock { try { action() } catch (e: Exception) { eventChannel.send(Notice(e.message ?: "操作に失敗しました")) } }
     } }
-    private suspend fun reconcile() = withContext(Dispatchers.IO) { AlarmScheduler.reconcile(context); WakeScheduler.reconcile(context) }
+    private suspend fun reconcile() = withContext(Dispatchers.IO) { AlarmScheduler.reconcile(context); WakeScheduler.reconcile(context)
+        runCatching { StudyWidget.updateAll(context, data.value) }
+    }
     private suspend fun change(transform: (StudyData) -> StudyData) { repository.update(transform); reconcile() }
     private fun protectSchedule(id: String) { check(data.value.timer?.scheduleId != id) { "タイマーを終了してから変更してください" } }
     private suspend fun undoSchedule(previous: Schedule, expected: Schedule?) {
@@ -145,7 +147,7 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
         check(WakeScheduler.notificationsAllowed(context)) { "目覚ましの通知を許可してください" }
         val wall = System.currentTimeMillis()
         val trial = WakeRun("test_${newId()}", id, "テスト・${alarm.label}".take(100), alarm.secondStep, alarm.questions, alarm.tagId, alarm.tagName,
-            kotlin.random.Random.nextInt(), wall, sound = alarm.sound)
+            kotlin.random.Random.nextInt(), wall, sound = alarm.sound, questionSubject = alarm.questionSubject)
         change { it.copy(wakeRuns = it.wakeRuns + trial) }
         WakeScheduler.startRinging(context)
         context.startActivity(android.content.Intent(context, WakeActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))

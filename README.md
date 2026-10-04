@@ -4,7 +4,16 @@
 Android版は [android](android/) にあります。Kotlin + Jetpack Composeで実装しています。
 Android Studioで開き、実行・ビルドする方法は [Android版のREADME](android/README.md) を参照してください。
 
-[Android版APK（1.4.0）をダウンロード](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.4.0/StudyCoPi-Android-1.4.0.apk) · [Releaseと変更内容](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.4.0)
+[Android版APK（1.4.1）をダウンロード](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.4.1/StudyCoPi-Android-1.4.1.apk) · [Releaseと変更内容](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.4.1)
+
+## v1.4.1
+
+- Androidウィジェットを6種類に追加：今日の学習、今日の予定、今日の勉強時間、累積予定時間と勉強時間、次の目覚まし、次の学習予定。長押しでサイズを変更すると表示も切り替わります。
+- Web・Androidの「その他 → StudyCoPiについて」に、バージョン、開発者、ライセンス、更新・報告ページを追加しました。
+- 起床問題は数学・英語・世界史・おまかせから選択できます。英語・世界史を各20問収録し、各ステップ1〜10問。英語・世界史は4択で、2段階を通じて同じ問題を繰り返しません。NFC解除も使えます。
+- 「その他 → 通知設定」で予定時刻の集中モードをオンにできます。タイマーを開始せずに集中画面を開き、「勉強を始める」で計測を開始します。完了済み、開始から5分以上経過した予定、計測中の別タイマーは対象外です。
+- Androidは前面で画面固定のOS確認を求め、バックグラウンドでは通常の通知から開きます。通常アプリは無断で他アプリを閉じたり、解除不可能な固定をしたりできません。Webは開いているページ内の集中画面で、端末全体は固定できません。
+- アカウント連携・自動同期は今回の対象外です。既存のJSONバックアップで端末間のデータを移行できます。
 
 ## 音源・時間割・ウィジェット（1.4）
 

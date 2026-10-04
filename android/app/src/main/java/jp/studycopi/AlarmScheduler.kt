@@ -59,6 +59,7 @@ object AlarmScheduler {
             if (wall > point.wall) { val key = "exam:${it.id}"; schedule(context, key, wall, "REMINDER"); next += key }
         }
         prefs.edit().putStringSet("reminders", next).apply()
+        ScheduledFocus.reconcile(context, data)
     }
     private fun showTimer(context: Context, data: StudyData) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -106,7 +107,8 @@ class AlarmReceiver : BroadcastReceiver() {
                 repo.load()
                 val point = clockPoint(context)
                 var finished: TimerSession? = null
-                if (intent.action == "REMINDER") AlarmScheduler.notifyReminder(context, intent.getStringExtra("key").orEmpty(), repo.data.value)
+                if (intent.action == "SCHEDULED_FOCUS") ScheduledFocus.notify(context, intent, repo.data.value, point.wall)
+                else if (intent.action == "REMINDER") AlarmScheduler.notifyReminder(context, intent.getStringExtra("key").orEmpty(), repo.data.value)
                 else repo.update { data ->
                     val timer = data.timer
                     if (timer == null || timer.id != intent.getStringExtra("timerId")) data

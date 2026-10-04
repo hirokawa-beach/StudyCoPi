@@ -50,7 +50,7 @@ fun wakeDaysText(days: Set<Int>) = when {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             Text("目覚まし", style = MaterialTheme.typography.headlineSmall)
-            Text("計算問題 → NFCタグ、または追加の計算問題で解除", style = MaterialTheme.typography.bodySmall,
+            Text("数学・英語・世界史の問題 → NFCタグ、または追加の問題で解除", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
         if (!notificationAllowed || !exactAllowed || !fullScreenAllowed) item {
@@ -92,7 +92,7 @@ fun wakeDaysText(days: Set<Int>) = when {
                             modifier = Modifier.semantics { contentDescription = "${alarm.label}をオン・オフ" })
                     }
                     Text("${wakeDaysText(alarm.days)} · ${AlarmSounds.label(alarm.sound)}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
-                    Text("計算${alarm.questions}問 → ${if (alarm.secondStep == "nfc") alarm.tagName else "計算${alarm.questions}問"}", style = MaterialTheme.typography.bodySmall)
+                    Text("${wakeSubjectLabel(alarm.questionSubject)} ${alarm.questions}問 → ${if (alarm.secondStep == "nfc") alarm.tagName else "追加${alarm.questions}問"}", style = MaterialTheme.typography.bodySmall)
                     if (alarm.enabled) Text("次回 " + Instant.ofEpochMilli(alarm.nextAt).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("M/d HH:mm")),
                         style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
                     Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
@@ -122,6 +122,7 @@ fun wakeDaysText(days: Set<Int>) = when {
     }
     var days by rememberSaveable { mutableStateOf(existing?.days?.sorted()?.joinToString(",") ?: "") }
     var mode by rememberSaveable { mutableStateOf(existing?.secondStep ?: "math") }
+    var questionSubject by rememberSaveable { mutableStateOf(existing?.questionSubject ?: "math") }
     var questions by rememberSaveable { mutableStateOf(existing?.questions ?: 3) }
     var tagId by rememberSaveable { mutableStateOf(existing?.tagId ?: "") }
     var tagName by rememberSaveable { mutableStateOf(existing?.tagName ?: "1階のタグ") }
@@ -186,14 +187,15 @@ fun wakeDaysText(days: Set<Int>) = when {
                 }, label = { Text(name) }) }
             }
             Row { TextButton(onClick = { days = "1,2,3,4,5" }) { Text("平日") }; TextButton(onClick = { days = "1,2,3,4,5,6,7" }) { Text("毎日") }; TextButton(onClick = { days = "" }) { Text("1回だけ") } }
-            ChoiceField("計算問題の数", questions.toString(), (1..5).map { it.toString() to "${it}問" }) { questions = it.toInt() }
-            Text("ステップ1：計算問題を解く", style = MaterialTheme.typography.titleSmall)
-            ChoiceField("ステップ2の解除方法", mode, listOf("math" to "追加の計算問題", "nfc" to "登録したNFCタグ")) { mode = it }
+            ChoiceField("問題の教科", questionSubject, wakeSubjects) { questionSubject = it }
+            ChoiceField("問題の数（各ステップ）", questions.toString(), (1..10).map { it.toString() to "${it}問" }) { questions = it.toInt() }
+            Text("ステップ1：選んだ教科の問題を解く", style = MaterialTheme.typography.titleSmall)
+            ChoiceField("ステップ2の解除方法", mode, listOf("math" to "追加の問題", "nfc" to "登録したNFCタグ")) { mode = it }
             if (mode == "nfc") {
                 OutlinedTextField(tagName, { tagName = it.take(100) }, label = { Text("タグを置く場所") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedButton(onClick = { registration.launch(Intent(context, NfcRegisterActivity::class.java)) }, modifier = Modifier.fillMaxWidth()) { Text(if (tagId.isEmpty()) "NFCタグを読み取って登録" else "NFCタグを登録し直す") }
                 Text(if (tagId.isEmpty()) "未登録" else "登録済み · $tagId", style = MaterialTheme.typography.bodySmall)
-                if (NfcAdapter.getDefaultAdapter(context) == null) Text("この端末にはNFCがありません。実機で登録するか、追加の計算問題を選んでください。", style = MaterialTheme.typography.bodySmall)
+                if (NfcAdapter.getDefaultAdapter(context) == null) Text("この端末にはNFCがありません。実機で登録するか、追加の問題を選んでください。", style = MaterialTheme.typography.bodySmall)
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("保存してオンにする", Modifier.weight(1f)); Switch(enabled, { enabled = it }, enabled = enabled || allowed)
@@ -208,7 +210,7 @@ fun wakeDaysText(days: Set<Int>) = when {
             Button(onClick = {
                 runCatching {
                     require(!enabled || allowed) { "通知と正確なアラームを許可してください" }
-                    val item = WakeAlarm(id, label.trim(), time, selectedDays, mode, questions, tagId, tagName.trim(), enabled, sound = sound)
+                    val item = WakeAlarm(id, label.trim(), time, selectedDays, mode, questions, tagId, tagName.trim(), enabled, sound = sound, questionSubject = questionSubject)
                     val checked = if (enabled) item.arm(System.currentTimeMillis()) else item
                     WakeBackup.validate(data.copy(wakeAlarms = data.wakeAlarms.filterNot { it.id == id } + checked))
                     model.saveWakeAlarm(item); close()

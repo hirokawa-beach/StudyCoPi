@@ -3,11 +3,20 @@
 Kotlin + Jetpack Composeで作ったAndroid版です。WebView・Capacitorは使いません。
 Android 8.0（API 26）以降に対応します。Web版はリポジトリ直下に残しています。
 
+## v1.4.1
+
+- Androidウィジェットを6種類に追加：今日の学習、今日の予定、今日の勉強時間、累積予定時間と勉強時間、次の目覚まし、次の学習予定。長押しでサイズを変更すると表示も切り替わります。
+- Web・Androidの「その他 → StudyCoPiについて」に、バージョン、開発者、ライセンス、更新・報告ページを追加しました。
+- 起床問題は数学・英語・世界史・おまかせから選択できます。英語・世界史を各20問収録し、各ステップ1〜10問。英語・世界史は4択で、2段階を通じて同じ問題を繰り返しません。NFC解除も使えます。
+- 「その他 → 通知設定」で予定時刻の集中モードをオンにできます。タイマーを開始せずに集中画面を開き、「勉強を始める」で計測を開始します。完了済み、開始から5分以上経過した予定、計測中の別タイマーは対象外です。
+- Androidは前面で画面固定のOS確認を求め、バックグラウンドでは通常の通知から開きます。通常アプリは無断で他アプリを閉じたり、解除不可能な固定をしたりできません。Webは開いているページ内の集中画面で、端末全体は固定できません。
+- アカウント連携・自動同期は今回の対象外です。既存のJSONバックアップで端末間のデータを移行できます。
+
 ## ダウンロード
 
-[StudyCoPi Android 1.4.0 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.4.0/StudyCoPi-Android-1.4.0.apk) をダウンロードして、Android端末で開いてください。
+[StudyCoPi Android 1.4.1 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.4.1/StudyCoPi-Android-1.4.1.apk) をダウンロードして、Android端末で開いてください。
 インストール元のブラウザやファイルアプリに「不明なアプリのインストール」の許可が必要な場合があります。
-開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.4.0) にあります。
+開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.4.1) にあります。
 
 ## 機能
 

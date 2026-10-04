@@ -5,7 +5,7 @@ import kotlin.random.Random
 
 data class WakeAlarm(val id: String = newId(), val label: String = "目覚まし", val time: String = "07:00",
     val days: Set<Int> = emptySet(), val secondStep: String = "math", val questions: Int = 3,
-    val tagId: String = "", val tagName: String = "1階のタグ", val enabled: Boolean = false, val nextAt: Long = 0, val sound: String = "system") {
+    val tagId: String = "", val tagName: String = "1階のタグ", val enabled: Boolean = false, val nextAt: Long = 0, val sound: String = "system", val questionSubject: String = "math") {
     fun nextAfter(wall: Long, zone: ZoneId = ZoneId.systemDefault()): Long {
         val now = Instant.ofEpochMilli(wall).atZone(zone)
         for (offset in 0..7) {
@@ -27,7 +27,8 @@ data class WakeQuestion(val left: Int, val right: Int, val multiply: Boolean) {
 /** Snapshot the task and NFC target at fire time; progress survives rotation/process recreation. */
 data class WakeRun(val id: String, val alarmId: String, val label: String, val secondStep: String,
     val questions: Int, val tagId: String, val tagName: String, val seed: Int,
-    val firedAt: Long, val stage: Int = 1, val solved: Int = 0, val sound: String = "system") {
+    val firedAt: Long, val stage: Int = 1, val solved: Int = 0, val sound: String = "system", val questionSubject: String = "math") {
+    val quiz: WakeQuiz get() = WakeQuizBank.forRun(this)
     val key: String get() = "$id:$stage:$solved"
     val needsTag: Boolean get() = stage == 2 && secondStep == "nfc"
     val question: WakeQuestion get() {
@@ -56,7 +57,7 @@ fun StudyData.claimWake(id: String, expected: Long, wall: Long, seed: Int = Rand
     if (!alarm.enabled || alarm.nextAt != expected || wall < expected || wall - expected > 15 * 60_000) return this
     val runId = "${alarm.id}_$expected"
     if (wakeRuns.any { it.id == runId }) return this
-    val run = WakeRun(runId, id, alarm.label, alarm.secondStep, alarm.questions, alarm.tagId, alarm.tagName, seed, wall, sound = alarm.sound)
+    val run = WakeRun(runId, id, alarm.label, alarm.secondStep, alarm.questions, alarm.tagId, alarm.tagName, seed, wall, sound = alarm.sound, questionSubject = alarm.questionSubject)
     return copy(wakeAlarms = wakeAlarms.map { if (it.id != id) it else if (it.days.isEmpty()) it.copy(enabled = false, nextAt = 0) else it.arm(wall) },
         wakeRuns = wakeRuns + run)
 }
@@ -64,13 +65,13 @@ fun StudyData.claimWake(id: String, expected: Long, wall: Long, seed: Int = Rand
 fun StudyData.answerWake(runId: String, key: String, answer: String): StudyData {
     val run = wakeRuns.find { it.id == runId } ?: return this
     require(run.key == key) { "問題が変わりました。現在の問題に答えてください" }
-    require(!run.needsTag && answer.toIntOrNull() == run.question.answer) { "答えが違います" }
+    require(!run.needsTag && run.quiz.accepts(answer)) { "答えが違います" }
     val next = run.advance()
     return copy(wakeRuns = wakeRuns.mapNotNull { if (it.id == runId) next else it })
 }
 fun StudyData.scanWake(runId: String, scanned: String): StudyData {
     val run = wakeRuns.find { it.id == runId } ?: return this
-    require(run.needsTag) { "先に計算問題を解いてください" }
+    require(run.needsTag) { "先に問題を解いてください" }
     require(validNfcId(scanned) && scanned == run.tagId) { "登録したタグとは違います" }
     return copy(wakeRuns = wakeRuns.filterNot { it.id == runId })
 }

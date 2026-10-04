@@ -143,6 +143,7 @@ import kotlin.math.roundToInt
                 displayScreen == "subjects" -> SubjectsScreen(data, model, { open("subject", it) })
                 displayScreen == "settings" -> SettingsScreen(data, model, { requestNotifications() })
                 displayScreen == "widget" -> WidgetScreen(data)
+                displayScreen == "about" -> AboutScreen()
                 displayScreen == "wake" -> WakeAlarmsScreen(data, model, { open("wake", it) }, { requestNotifications() })
                 displayScreen == "backup" -> BackupScreen(data, { export.launch("StudyCoPi-${LocalDate.now()}.json") },
                     { import.launch(arrayOf("application/json", "text/*", "application/octet-stream")) })
@@ -575,11 +576,11 @@ private fun timerText(milliseconds: Long): String {
 
 @Composable private fun MoreScreen(navigate: (String) -> Unit) {
     val icons = mapOf("timer" to Icons.Default.PlayArrow, "wake" to Icons.Default.DateRange, "subjects" to Icons.AutoMirrored.Filled.List, "settings" to Icons.Default.Settings,
-        "widget" to Icons.Default.Home, "backup" to Icons.Default.Share, "help" to Icons.Default.Info)
+        "widget" to Icons.Default.Home, "backup" to Icons.Default.Share, "help" to Icons.Default.Info, "about" to Icons.Default.Info)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         PageTitle("その他")
-        listOf(Triple("timer", "集中タイマー", "予定を作らず、そのまま勉強を始める"), Triple("wake", "目覚まし", "計算問題とNFCタグで、2段階解除"), Triple("subjects", "教科", "教科の追加・編集・並び替え"),
-            Triple("widget", "ウィジェット", "今日の予定と勉強時間をホーム画面に"), Triple("settings", "通知設定", "タイマー終了・学習予定・試験の通知"), Triple("backup", "バックアップ", "別の端末へ引き継ぐ・ファイルに保存"), Triple("help", "使い方", "初めての方へ・操作ガイド")).forEach { (key, title, description) ->
+        listOf(Triple("timer", "集中タイマー", "予定を作らず、そのまま勉強を始める"), Triple("wake", "目覚まし", "数学・英語・世界史とNFCタグで、2段階解除"), Triple("subjects", "教科", "教科の追加・編集・並び替え"),
+            Triple("widget", "ウィジェット", "6種類の表示・サイズを選べる"), Triple("settings", "通知設定", "タイマー終了・学習予定・試験の通知"), Triple("backup", "バックアップ", "別の端末へ引き継ぐ・ファイルに保存"), Triple("help", "使い方", "初めての方へ・操作ガイド"), Triple("about", "StudyCoPiについて", "バージョン・開発者・更新情報")).forEach { (key, title, description) ->
             Card(onClick = { navigate(key) }, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 ListItem(headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) }, supportingContent = { Text(description, style = MaterialTheme.typography.bodySmall) },
@@ -612,6 +613,8 @@ private fun timerText(milliseconds: Long): String {
         SettingSwitch("学習予定", "予定の開始前にお知らせ", p.reminders) { value -> if (value) request(); model.preferences { it.copy(reminders = value) } }
         ChoiceField("何分前に通知する？", p.reminderMinutes.toString(), listOf(0, 5, 10, 15, 30, 60).map { it.toString() to if (it == 0) "開始時刻" else "${it}分前" }) { value -> model.preferences { it.copy(reminderMinutes = value.toInt()) } }
         SettingSwitch("試験の前日", "試験開始日の前日18時にお知らせ", p.examReminder) { value -> if (value) request(); model.preferences { it.copy(examReminder = value) } }
+        SettingSwitch("予定時刻に画面固定", "開始時刻に集中画面へ。タイマーは自分で開始します", p.scheduledFocus) { value -> if (value) request(); model.preferences { it.copy(scheduledFocus = value) } }
+        Text("アプリを開いているときはAndroidの画面固定を求めます。ほかのアプリを使っている間は通知から開いてください。OSの確認が必要で、所定の操作で解除できます。", style = MaterialTheme.typography.bodySmall)
         HorizontalDivider()
         OutlinedButton(onClick = { context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)) }) { Text("Androidの通知設定") }
         if (Build.VERSION.SDK_INT >= 31) OutlinedButton(onClick = { context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))) }) { Text("正確なアラームの設定") }

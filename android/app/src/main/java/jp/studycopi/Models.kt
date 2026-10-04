@@ -33,7 +33,7 @@ data class Schedule(val id: String = newId(), val subjectId: String, val datetim
 data class ExamSession(val id: String = newId(), val subject: String, val date: String,
     val startTime: String = "", val endTime: String = "", val range: String = "", val examGroupId: String = "")
 data class Preferences(val timerNotification: Boolean = true, val reminders: Boolean = false,
-    val reminderMinutes: Int = 15, val examReminder: Boolean = false)
+    val reminderMinutes: Int = 15, val examReminder: Boolean = false, val scheduledFocus: Boolean = false)
 data class ClockPoint(val wall: Long, val monotonic: Long, val boot: Int)
 data class TimerSession(val id: String = newId(), val subjectId: String, val examGroupId: String = "",
     val scheduleId: String = "", val targetMs: Long, val originalStart: String,

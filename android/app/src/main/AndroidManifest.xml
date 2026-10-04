@@ -19,6 +19,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".ScheduledFocusActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".FocusActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".WakeActivity" android:exported="false" android:launchMode="singleTop"
             android:showWhenLocked="true" android:turnScreenOn="true" android:windowSoftInputMode="adjustResize" />
@@ -32,6 +33,26 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/study_widget_info" />
+        </receiver>
+        <receiver android:name=".TodayPlansWidget" android:exported="true" android:label="今日の予定">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/today_plans_widget_info" />
+        </receiver>
+        <receiver android:name=".TodayHoursWidget" android:exported="true" android:label="今日の勉強時間">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/today_hours_widget_info" />
+        </receiver>
+        <receiver android:name=".TotalHoursWidget" android:exported="true" android:label="予定時間と累積勉強時間">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/total_hours_widget_info" />
+        </receiver>
+        <receiver android:name=".NextAlarmWidget" android:exported="true" android:label="次の目覚まし">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/next_alarm_widget_info" />
+        </receiver>
+        <receiver android:name=".NextPlanWidget" android:exported="true" android:label="次の学習予定">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/next_plan_widget_info" />
         </receiver>
         <receiver android:name=".WakeReceiver" android:exported="false" />
         <receiver android:name=".AlarmReceiver" android:exported="false" />

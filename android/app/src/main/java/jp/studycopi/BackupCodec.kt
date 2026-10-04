@@ -24,7 +24,7 @@ object BackupCodec {
         if (internal) {
             root.put("preferences", obj("timerNotification" to data.preferences.timerNotification,
                 "reminders" to data.preferences.reminders, "reminderMinutes" to data.preferences.reminderMinutes,
-                "examReminder" to data.preferences.examReminder))
+                "examReminder" to data.preferences.examReminder, "scheduledFocus" to data.preferences.scheduledFocus))
             data.timer?.let { root.put("timer", obj("id" to it.id, "subjectId" to it.subjectId,
                 "examGroupId" to it.examGroupId, "scheduleId" to it.scheduleId, "targetMs" to it.targetMs,
                 "originalStart" to it.originalStart, "runWall" to it.runWall, "runMonotonic" to it.runMonotonic,
@@ -58,7 +58,7 @@ object BackupCodec {
             it.getLong("runMonotonic"), it.getInt("boot"), it.getLong("accruedMs"), it.getBoolean("paused")) }
         timer?.let { require(it.targetMs in 60_000..86_400_000 && it.accruedMs in 0..it.targetMs); dateTime(it.originalStart) }
         return data.copy(timer = timer, preferences = Preferences(p.optBoolean("timerNotification", true),
-            p.optBoolean("reminders", false), p.optInt("reminderMinutes", 15).coerceIn(0, 1440), p.optBoolean("examReminder", false)))
+            p.optBoolean("reminders", false), p.optInt("reminderMinutes", 15).coerceIn(0, 1440), p.optBoolean("examReminder", false), p.optBoolean("scheduledFocus", false)))
     }
     fun validate(data: StudyData) {
         WakeBackup.validate(data)

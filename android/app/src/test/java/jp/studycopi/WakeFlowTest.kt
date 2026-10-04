@@ -60,6 +60,25 @@ class WakeFlowTest {
         compose.onNodeWithText("回答").performClick()
         compose.waitUntil(15_000) { app.repository.data.value.wakeRuns.isEmpty() }
     }
+    @Test fun englishMultipleChoiceRequiresCorrectAnswersAndSurvivesRotation() {
+        ready()
+        runBlocking { app.repository.update { it.copy(wakeRuns = it.wakeRuns.map { run -> run.copy(questionSubject = "english") }) } }
+        compose.waitUntil(15000) { compose.onAllNodesWithText("まずは英語").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("答え").assertDoesNotExist()
+        val first = app.repository.data.value.wakeRuns.single()
+        compose.onNodeWithText(first.quiz.choices.first { it != first.quiz.answer }).performScrollTo().performClick()
+        compose.waitUntil(15000) { compose.onAllNodesWithText("答えが違います").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(1, app.repository.data.value.wakeRuns.single().stage)
+        compose.onNodeWithText(first.quiz.answer).performScrollTo().performClick()
+        compose.waitUntil(15000) { app.repository.data.value.wakeRuns.single().stage == 2 }
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("最後の英語").assertExists()
+        val second = app.repository.data.value.wakeRuns.single()
+        assertNotEquals(first.quiz.text, second.quiz.text)
+        capture("wake-english-dark-320.png")
+        compose.onNodeWithText(second.quiz.answer).performScrollTo().performClick()
+        compose.waitUntil(15000) { app.repository.data.value.wakeRuns.isEmpty() }
+    }
     @Test fun nfcStageShowsRegisteredDestinationAndEmergencyStopRequiresConfirmation() {
         ready()
         runBlocking { app.repository.update { it.copy(wakeRuns = it.wakeRuns.map { run ->

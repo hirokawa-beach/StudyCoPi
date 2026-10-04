@@ -8,4 +8,9 @@
         <item name="android:maxLines">2</item>
         <item name="android:ellipsize">end</item><item name="android:paddingBottom">8dp</item>
     </style>
+    <string name="widget_today_plans_description">今日の予定。長押しして大きさを変更できます。</string>
+    <string name="widget_today_hours_description">今日の勉強時間。長押しして大きさを変更できます。</string>
+    <string name="widget_total_hours_description">予定時間と累積勉強時間。長押しして大きさを変更できます。</string>
+    <string name="widget_next_alarm_description">次の目覚まし。長押しして大きさを変更できます。</string>
+    <string name="widget_next_plan_description">次の学習予定。長押しして大きさを変更できます。</string>
 </resources>

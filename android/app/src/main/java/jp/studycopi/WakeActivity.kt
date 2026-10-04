@@ -102,14 +102,18 @@ class WakeActivity : JapaneseActivity() {
                                 OutlinedButton(onClick = { startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }, modifier = Modifier.fillMaxWidth()) { Text("NFCの設定を開く") }
                         } else {
                             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) { Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text(if (run.stage == 1) "まずは計算問題" else "最後の計算問題", style = MaterialTheme.typography.titleLarge)
+                                Text(if (run.stage == 1) "まずは${wakeSubjectLabel(run.questionSubject)}" else "最後の${wakeSubjectLabel(run.questionSubject)}", style = MaterialTheme.typography.titleLarge)
                                 Text("${run.solved + 1} / ${run.questions}問", style = MaterialTheme.typography.labelMedium)
-                                Text(run.question.text, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.align(Alignment.CenterHorizontally))
+                                Text(run.quiz.text, style = if (run.quiz.choices.isEmpty()) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge, modifier = Modifier.align(Alignment.CenterHorizontally))
                             } }
+                            if (run.quiz.choices.isNotEmpty()) run.quiz.choices.forEach { choice ->
+                                OutlinedButton(onClick = { model.answer(run.id, run.key, choice) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(choice) }
+                            } else {
                             OutlinedTextField(answer, { answer = it.filter(Char::isDigit).take(6) }, label = { Text("答え") }, singleLine = true,
                                 modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                                 keyboardActions = KeyboardActions(onDone = { model.answer(run.id, run.key, answer) }))
                             Button(onClick = { model.answer(run.id, run.key, answer) }, enabled = answer.isNotEmpty(), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("回答") }
+                            }
                         }
                         if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
                         if (!run.needsTag && status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
