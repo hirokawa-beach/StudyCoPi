@@ -1,8 +1,15 @@
-const CACHE_NAME = "studycopi-v7";
+const CACHE_NAME = "studycopi-v8";
 const ASSETS = [
   "./",
   "./index.html",
   "./app.js",
+  "./enhancements.js",
+  "./shared/sounds/bell.wav",
+  "./shared/sounds/pulse.wav",
+  "./shared/sounds/chime.wav",
+  "./icons/app-icon.png",
+  "./icons/app-icon-192.png",
+  "./icons/app-icon-512.png",
   "./study-model.js",
   "./ui.css",
   "./app-ui.css",

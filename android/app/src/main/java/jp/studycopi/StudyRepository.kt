@@ -22,7 +22,7 @@ class StudyApplication : Application() {
 }
 
 /** One atomic document, serialized through a mutex; failed writes never publish a new UI state. */
-class StudyRepository(context: Context) {
+class StudyRepository(private val context: Context) {
     private val file = AtomicFile(File(context.filesDir, "study-data.json"))
     private val mutex = Mutex()
     private var loaded = false
@@ -53,6 +53,7 @@ class StudyRepository(context: Context) {
         } catch (error: Exception) { file.failWrite(output); throw error }
         loaded = true
         mutable.value = next
+        runCatching { StudyWidget.updateAll(context, next) }.onFailure { android.util.Log.w("StudyCoPi", "Widget refresh failed", it) }
         return next
     }
 }

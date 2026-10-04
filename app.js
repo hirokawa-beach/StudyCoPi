@@ -22,7 +22,10 @@ function load(key, def) {
   }
 }
 function save(key, val) {
-  localStorage.setItem(key, JSON.stringify(val));
+  const serialized = JSON.stringify(val);
+  const changed = localStorage.getItem(key) !== serialized;
+  localStorage.setItem(key, serialized);
+  if (changed && typeof markBackupDirty === "function") markBackupDirty(key);
 }
 
 let subjects = load("sl_subjects", [
@@ -160,6 +163,7 @@ function undoLastAction() {
 
 // ── Navigation ────────────────────────────────────────
 function showView(name) {
+  if (typeof stopSoundPreview === "function") stopSoundPreview();
   if (!document.getElementById("view-" + name)) return;
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + name));
   document.querySelectorAll(".nav-item").forEach((n) => {
@@ -178,6 +182,7 @@ function showView(name) {
   if (name === 'schedule' || name === 'timetable') document.getElementById(name === 'schedule' ? 'schedule-filter-slot' : 'week-filter-slot').append(document.getElementById('schedule-filters'));
   if (name === "settings") loadNotifSettingsUI();
   render();
+  if (typeof updatePlanTabs === "function") updatePlanTabs();
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 function render() {
@@ -317,12 +322,14 @@ function timetableData() {
   };
 }
 let ttMode = "list";
-function setTTMode(mode) { ttMode = mode; applyTTMode(); layoutTimetableBlocks(); }
+function setTTMode(mode) {
+  if (typeof stopSoundPreview === "function") stopSoundPreview(); ttMode = mode; applyTTMode(); layoutTimetableBlocks(); }
 function applyTTMode() {
   const grid = ttMode === "grid";
   document.getElementById("timetable-grid").style.display = grid ? "" : "none";
   document.getElementById("mobile-day-list").style.display = grid ? "none" : "";
   for (const mode of ["list", "grid"]) document.getElementById("tt-mode-" + mode)?.setAttribute("aria-pressed", String(ttMode === mode));
+  if (typeof updatePlanTabs === "function") updatePlanTabs();
 }
 
 // ── Timetable ─────────────────────────────────────────
@@ -700,6 +707,7 @@ function updateFocusMinutes() {
 }
 
 function startFocus() {
+  if (typeof unlockTimerSound === "function") unlockTimerSound();
   if (document.getElementById("focus-active").style.display !== "none") return;
   const minutes = Number(document.getElementById("focus-minutes").value);
   if (!subjects.some((s) => s.id === document.getElementById("focus-subject").value)) { toast("先に「その他 → 教科」で教科を登録してください"); return; }
@@ -869,6 +877,8 @@ function exportData() {
     version: 3,
     app: APP_NAME,
     exportedAt: new Date().toISOString(),
+    web: typeof webSound !== "undefined" ? {sound: webSound} : {},
+    android: load("sl_android_backup", undefined),
     subjects,
     schedules,
     exams,
@@ -880,11 +890,12 @@ function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `studycopi-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `studycopi-backup-${StudyModel.localDate()}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+  if (typeof markBackupExported === "function") markBackupExported();
 }
 
 function importData(input) {
@@ -893,11 +904,15 @@ function importData(input) {
   const reader = new FileReader();
   reader.onload = (event) => {
     try {
-      const data = StudyModel.validateBackup(JSON.parse(event.target.result));
+      const raw = JSON.parse(event.target.result);
+      const data = StudyModel.validateBackup(raw);
+      const sound = typeof validateWebSound === "function" ? validateWebSound(raw.web?.sound) : null;
       if (!confirm("現在のデータを上書きして復元します。よろしいですか？")) return;
       if (document.getElementById("focus-active").style.display !== "none") { toast("タイマーを終了してから復元してください"); return; }
       subjects = data.subjects; schedules = data.schedules; exams = data.exams; examGroups = data.examGroups;
       save("sl_subjects", subjects); save("sl_schedules", schedules); save("sl_exams", exams); save("sl_exam_groups", examGroups);
+      if (sound) { webSound = sound; save("sl_sound", sound); loadWebSoundUI(); }
+      if (raw.android && typeof raw.android === "object" && !Array.isArray(raw.android)) save("sl_android_backup", raw.android); else localStorage.removeItem("sl_android_backup");
       render(); toast("データを復元しました");
     } catch (error) { toast(`復元できませんでした: ${error.message}`); }
     finally { input.value = ""; }
@@ -1270,8 +1285,8 @@ function sendNotif(title, body, tag) {
   }
 
   // アイコンは絶対URLで指定（Android Chrome が相対パスを正しく解決しない場合があるため）
-  const iconUrl = new URL("icons/icon-192.png", window.location.href).href;
-  const badgeUrl = new URL("icons/icon-192.png", window.location.href).href;
+  const iconUrl = new URL("icons/app-icon.png", window.location.href).href;
+  const badgeUrl = new URL("icons/app-icon.png", window.location.href).href;
 
   const options = {
     body,
@@ -1309,6 +1324,7 @@ function sendNotif(title, body, tag) {
 
 // ─ タイマー終了通知（finishFocusAuto から呼ぶ）
 function notifyTimerEnd(subjectName) {
+  if (typeof playTimerSound === "function") playTimerSound();
   if (!notifSettings.timer) return;
   sendNotif(
     "タイマー終了！",

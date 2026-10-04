@@ -145,7 +145,7 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
         check(WakeScheduler.notificationsAllowed(context)) { "目覚ましの通知を許可してください" }
         val wall = System.currentTimeMillis()
         val trial = WakeRun("test_${newId()}", id, "テスト・${alarm.label}".take(100), alarm.secondStep, alarm.questions, alarm.tagId, alarm.tagName,
-            kotlin.random.Random.nextInt(), wall)
+            kotlin.random.Random.nextInt(), wall, sound = alarm.sound)
         change { it.copy(wakeRuns = it.wakeRuns + trial) }
         WakeScheduler.startRinging(context)
         context.startActivity(android.content.Intent(context, WakeActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))

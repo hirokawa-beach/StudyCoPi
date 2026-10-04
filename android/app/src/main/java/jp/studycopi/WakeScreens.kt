@@ -4,6 +4,9 @@ package jp.studycopi
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.media.MediaPlayer
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.nfc.NfcAdapter
 import android.os.Build
 import android.provider.Settings
@@ -18,6 +21,9 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -41,7 +47,7 @@ fun wakeDaysText(days: Set<Int>) = when {
     val notificationAllowed = WakeScheduler.notificationsAllowed(context)
     val exactAllowed = AlarmScheduler.exactAllowed(context)
     val fullScreenAllowed = WakeScheduler.fullScreenAllowed(context)
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             Text("目覚まし", style = MaterialTheme.typography.headlineSmall)
             Text("計算問題 → NFCタグ、または追加の計算問題で解除", style = MaterialTheme.typography.bodySmall,
@@ -85,7 +91,7 @@ fun wakeDaysText(days: Set<Int>) = when {
                             enabled = alarm.enabled || notificationAllowed && exactAllowed,
                             modifier = Modifier.semantics { contentDescription = "${alarm.label}をオン・オフ" })
                     }
-                    Text(wakeDaysText(alarm.days), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                    Text("${wakeDaysText(alarm.days)} · ${AlarmSounds.label(alarm.sound)}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
                     Text("計算${alarm.questions}問 → ${if (alarm.secondStep == "nfc") alarm.tagName else "計算${alarm.questions}問"}", style = MaterialTheme.typography.bodySmall)
                     if (alarm.enabled) Text("次回 " + Instant.ofEpochMilli(alarm.nextAt).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("M/d HH:mm")),
                         style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
@@ -105,6 +111,15 @@ fun wakeDaysText(days: Set<Int>) = when {
     val id = rememberSaveable { existing?.id ?: newId() }
     var label by rememberSaveable { mutableStateOf(existing?.label ?: "目覚まし") }
     var time by rememberSaveable { mutableStateOf(existing?.time ?: "07:00") }
+    var sound by rememberSaveable { mutableStateOf(existing?.sound ?: "system") }
+    var preview by remember { mutableStateOf<MediaPlayer?>(null) }
+    fun stopPreview() { preview?.release(); preview = null }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) stopPreview() }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); stopPreview() }
+    }
     var days by rememberSaveable { mutableStateOf(existing?.days?.sorted()?.joinToString(",") ?: "") }
     var mode by rememberSaveable { mutableStateOf(existing?.secondStep ?: "math") }
     var questions by rememberSaveable { mutableStateOf(existing?.questions ?: 3) }
@@ -117,6 +132,20 @@ fun wakeDaysText(days: Set<Int>) = when {
     val registration = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) result.data?.getStringExtra("tagId")?.let { tagId = it; error = "" }
     }
+    val soundPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            @Suppress("DEPRECATION")
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            if (uri != null && AlarmSounds.valid(uri.toString())) sound = uri.toString()
+        }
+    }
+    val audioFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runCatching {
+            require(AlarmSounds.valid(uri.toString())) { "この音声ファイルは利用できません" }
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            sound = uri.toString(); error = ""
+        }.onFailure { error = "音源を保存できませんでした。別の音源を選んでください" }
+    }
     val selectedDays = days.split(',').mapNotNull(String::toIntOrNull).toSet()
     val ringing = data.wakeRuns.any { it.alarmId == id }
     Column(Modifier.fillMaxWidth().heightIn(max = 720.dp).padding(horizontal = 20.dp)) {
@@ -127,6 +156,29 @@ fun wakeDaysText(days: Set<Int>) = when {
         Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             OutlinedTextField(label, { label = it.take(100) }, label = { Text("目覚ましの名前") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             TimeField("鳴らす時刻", time) { time = it }
+            ChoiceField("アラーム音", sound, AlarmSounds.choices + if (sound.startsWith("content://")) listOf(sound to "選択した端末の音源") else emptyList()) { stopPreview(); sound = it }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    stopPreview()
+                    soundPicker.launch(Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+                        .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                        .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                        .putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, if (sound.startsWith("content://")) Uri.parse(sound) else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)))
+                }, modifier = Modifier.weight(1f)) { Text("端末の音") }
+                OutlinedButton(onClick = { stopPreview(); audioFile.launch(arrayOf("audio/*")) }, modifier = Modifier.weight(1f)) { Text("音声ファイル") }
+            }
+            TextButton(onClick = {
+                if (preview != null) stopPreview() else runCatching {
+                    val player = MediaPlayer(); preview = player
+                    player.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build())
+                    AlarmSounds.source(player, context, sound)
+                    player.setOnPreparedListener { it.start() }
+                    player.setOnCompletionListener { stopPreview() }
+                    player.setOnErrorListener { _, _, _ -> stopPreview(); error = "音源を再生できません。選び直してください"; true }
+                    player.prepareAsync()
+                }.onFailure { stopPreview(); error = "音源を再生できません。選び直してください" }
+            }) { Text(if (preview == null) "音を試聴" else "試聴を止める") }
+            Text("端末の音源は別のスマホへの復元時に選び直してください。", style = MaterialTheme.typography.bodySmall)
             Text("繰り返し · ${wakeDaysText(selectedDays)}", style = MaterialTheme.typography.labelLarge)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 wakeDayNames.forEachIndexed { index, name -> FilterChip(selected = index + 1 in selectedDays, onClick = {
@@ -156,7 +208,7 @@ fun wakeDaysText(days: Set<Int>) = when {
             Button(onClick = {
                 runCatching {
                     require(!enabled || allowed) { "通知と正確なアラームを許可してください" }
-                    val item = WakeAlarm(id, label.trim(), time, selectedDays, mode, questions, tagId, tagName.trim(), enabled)
+                    val item = WakeAlarm(id, label.trim(), time, selectedDays, mode, questions, tagId, tagName.trim(), enabled, sound = sound)
                     val checked = if (enabled) item.arm(System.currentTimeMillis()) else item
                     WakeBackup.validate(data.copy(wakeAlarms = data.wakeAlarms.filterNot { it.id == id } + checked))
                     model.saveWakeAlarm(item); close()

@@ -164,6 +164,7 @@ class ComposeFlowTest {
         assertEquals(JapaneseFont, layouts.single().layoutInput.style.fontFamily)
         assertEquals("ja", compose.activity.resources.configuration.locales[0].language)
         capture("week-short-dark-320.png")
+        compose.onNodeWithTag("plans-list").performScrollToNode(hasTestTag("schedule-five"))
         compose.onNodeWithTag("subject-five", useUnmergedTree = true).performScrollTo().assertIsDisplayed().assertTextEquals(name)
         val record = compose.onAllNodesWithText("記録").onLast()
         record.performScrollTo().assertIsDisplayed()

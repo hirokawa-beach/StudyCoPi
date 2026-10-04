@@ -22,6 +22,7 @@ class WakeRingingService : Service() {
     private var fallback: ToneGenerator? = null
     private var fallbackJob: Job? = null
     private var sounding = false
+    private var soundingRun = ""
     private var audioFocus: AudioFocusRequest? = null
     private val vibration by lazy { getSystemService(Vibrator::class.java) }
     override fun onBind(intent: Intent?) = null
@@ -39,7 +40,7 @@ class WakeRingingService : Service() {
                     if (run == null) { stopSound(); stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
                     else {
                         getSystemService(NotificationManager::class.java).notify(WakeScheduler.NOTIFICATION, WakeScheduler.notification(this@WakeRingingService, run))
-                        if (!sounding) startSound()
+                        if (!sounding || soundingRun != run.id) { stopSound(); soundingRun = run.id; startSound(run.sound) }
                     }
                 }
             } catch (e: Exception) {
@@ -49,23 +50,33 @@ class WakeRingingService : Service() {
         }
         return START_STICKY
     }
-    private fun startSound() {
+    private fun startSound(sound: String) {
         sounding = true
         val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
         audioFocus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes(attributes)
             .setOnAudioFocusChangeListener { }.build().also { getSystemService(AudioManager::class.java).requestAudioFocus(it) }
         vibration?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 600, 700), 0), attributes)
-        try {
-            player = MediaPlayer().apply {
-                setAudioAttributes(attributes); setWakeMode(this@WakeRingingService, PowerManager.PARTIAL_WAKE_LOCK)
-                setDataSource(this@WakeRingingService, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
-                isLooping = true
-                setOnPreparedListener { if (sounding) it.start() }
-                setOnErrorListener { _, _, _ -> startFallback(); true }
-                prepareAsync()
+        startPlayer(sound, attributes)
+    }
+    private fun startPlayer(sound: String, attributes: AudioAttributes) {
+        player?.release()
+        val current = MediaPlayer()
+        player = current
+        fun failed() {
+            if (!sounding || player !== current) return
+            if (sound != "system") startPlayer("system", attributes) else {
+                current.release(); player = null; startFallback()
             }
-        } catch (_: Exception) { startFallback() }
+        }
+        try {
+            current.setAudioAttributes(attributes)
+            current.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK)
+            AlarmSounds.source(current, this, sound)
+            current.isLooping = true
+            current.setOnPreparedListener { if (sounding && player === it) it.start() }
+            current.setOnErrorListener { _, _, _ -> Handler(Looper.getMainLooper()).post { failed() }; true }
+            current.prepareAsync()
+        } catch (_: Exception) { failed() }
     }
     private fun startFallback() {
         if (!sounding || fallbackJob != null) return
@@ -77,7 +88,7 @@ class WakeRingingService : Service() {
         }
     }
     private fun stopSound() {
-        sounding = false; fallbackJob?.cancel(); fallbackJob = null
+        sounding = false; soundingRun = ""; fallbackJob?.cancel(); fallbackJob = null
         player?.release(); player = null; fallback?.release(); fallback = null; vibration?.cancel()
         audioFocus?.let { getSystemService(AudioManager::class.java).abandonAudioFocusRequest(it) }; audioFocus = null
     }

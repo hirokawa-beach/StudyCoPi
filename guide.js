@@ -1,6 +1,6 @@
 /* The guide points at real controls. Its example card never enters study data. */
 let guideContent = null, guideStep = 0, guideTrigger = null, guideReturnView = 'dashboard', guideTarget = null;
-const GUIDE_ROUTES = {today:'dashboard',plans:'schedule',exams:'examgroups',timer:'focus',record:'dashboard',stats:'hours',subjects:'subjects',backup:'data',settings:'settings',wake:'android'};
+const GUIDE_ROUTES = {today:'dashboard',plans:'schedule',exams:'examgroups',timer:'focus',record:'dashboard',stats:'hours',subjects:'subjects',backup:'data',settings:'settings',wake:'android',widget:'android'};
 const TOUR_VIEWS = ['examgroups','schedule','focus','schedule','hours'];
 function guideRoute(route) { showView(GUIDE_ROUTES[route] || 'dashboard'); }
 function openGuide() {
@@ -57,7 +57,7 @@ async function initializeGuide() {
   try {
     const response = await fetch('./shared/study-guide.json'); if (!response.ok) throw new Error('Guide unavailable');
     guideContent = await response.json();
-    document.getElementById('help-topics').innerHTML = guideContent.topics.map(topic => `<details class="help-topic"><summary>${esc(topic.title)}</summary><div>${topic.body.map(line=>`<p>${esc(line)}</p>`).join('')}${topic.web ? `<p class="muted">${esc(topic.web)}</p>` : ''}<button class="btn btn-tonal" onclick="guideRoute('${topic.route}')">${topic.route === 'wake' ? 'Android版の案内を開く' : esc(topic.action)}</button></div></details>`).join('');
+    document.getElementById('help-topics').innerHTML = guideContent.topics.map(topic => `<details class="help-topic"><summary>${esc(topic.title)}</summary><div>${topic.body.map(line=>`<p>${esc(line)}</p>`).join('')}${topic.web ? `<p class="muted">${esc(topic.web)}</p>` : ''}<button class="btn btn-tonal" onclick="guideRoute('${topic.route}')">${['wake','widget'].includes(topic.route) ? 'Android版の案内を開く' : esc(topic.action)}</button></div></details>`).join('');
     if (load('sl_guide_version', 0) < guideContent.version && document.getElementById('focus-active').style.display === 'none') openGuide();
   } catch { document.getElementById('help-topics').textContent = '使い方を読み込めませんでした。通信を確認して再読み込みしてください。'; }
 }

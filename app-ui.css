@@ -201,3 +201,17 @@ progress::-moz-progress-bar { background:var(--accent); border-radius:4px; }
 @media(prefers-reduced-motion:no-preference) { .guide-shell { animation:guide-appear .15s ease-out; } @keyframes guide-appear { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } } }
 
 .guide-shell > .guide-location { margin:0 20px 4px; flex-shrink:0; }
+
+.backup-reminder { margin:0 0 20px; padding:16px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+.backup-reminder p { margin:8px 0 12px; font-size:13px; color:var(--text2); }
+.backup-reminder[hidden] { display:none; }
+.sound-settings { margin:16px 0; }
+.sound-settings p { margin:12px 0; font-size:13px; }
+.sound-toggle { display:flex; align-items:center; gap:12px; min-height:48px; font-size:14px; margin:8px 0; }
+.sound-toggle input { width:20px; height:20px; }
+.plan-tabs .btn { white-space:nowrap; padding:10px 12px; }
+
+.backup-reminder .btn-row { display:flex; flex-wrap:nowrap; gap:8px; }
+.backup-reminder .btn-primary { width:auto; flex:1; }
+.backup-reminder .btn { white-space:nowrap; }
+.sound-toggle input { min-height:20px; accent-color:var(--accent); }

@@ -142,6 +142,7 @@ import kotlin.math.roundToInt
                 displayScreen == "timer" -> TimerScreen(data, point, model, { requestNotifications() })
                 displayScreen == "subjects" -> SubjectsScreen(data, model, { open("subject", it) })
                 displayScreen == "settings" -> SettingsScreen(data, model, { requestNotifications() })
+                displayScreen == "widget" -> WidgetScreen(data)
                 displayScreen == "wake" -> WakeAlarmsScreen(data, model, { open("wake", it) }, { requestNotifications() })
                 displayScreen == "backup" -> BackupScreen(data, { export.launch("StudyCoPi-${LocalDate.now()}.json") },
                     { import.launch(arrayOf("application/json", "text/*", "application/octet-stream")) })
@@ -303,7 +304,8 @@ import kotlin.math.roundToInt
     var subject by rememberSaveable { mutableStateOf("") }
     var status by rememberSaveable { mutableStateOf("") }
     var pastOpen by rememberSaveable { mutableStateOf(false) }
-    var weekly by rememberSaveable { mutableStateOf(false) }
+    var planMode by rememberSaveable { mutableStateOf("list") }
+    val weekly = planMode != "list"
     var weekOffset by rememberSaveable { mutableIntStateOf(0) }
     var dayOffset by rememberSaveable { mutableIntStateOf(LocalDate.now().dayOfWeek.value - 1) }
     val week = weekStart(LocalDate.now()).plusWeeks(weekOffset.toLong())
@@ -312,12 +314,13 @@ import kotlin.math.roundToInt
         (subject.isEmpty() || data.subject(subject).name == it.subject) && status.isEmpty() }
     val dates = (items.map { it.date } + exams.map { LocalDate.parse(it.date) }).distinct().sorted()
     val visibleItems = if (weekly) items.filter { it.date in week..week.plusDays(6) } else items
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 96.dp)) {
+    LazyColumn(Modifier.fillMaxSize().testTag("plans-list"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 96.dp)) {
         item {
             PageTitle(if (weekly) "週間の予定" else "予定一覧")
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                SegmentedButton(selected = !weekly, onClick = { weekly = false }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("一覧") }
-                SegmentedButton(selected = weekly, onClick = { weekly = true }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("週間表示") }
+                listOf("list" to "一覧", "days" to "週間表示", "grid" to "時間割").forEachIndexed { index, (key, label) ->
+                    SegmentedButton(selected = planMode == key, onClick = { planMode = key }, shape = SegmentedButtonDefaults.itemShape(index, 3)) { Text(label) }
+                }
             }
             TextButton(onClick = { filtersOpen = !filtersOpen }) {
                 Icon(Icons.Default.Search, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
@@ -336,7 +339,7 @@ import kotlin.math.roundToInt
                     TextButton(onClick = { weekOffset = 0; dayOffset = LocalDate.now().dayOfWeek.value - 1 }) { Text("今週") }
                     IconButton(onClick = { weekOffset++ }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "次週") }
                 }
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (planMode == "days") Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     repeat(7) { index ->
                         val date = week.plusDays(index.toLong())
                         val count = items.count { it.date == date } + exams.count { it.date == date.toString() }
@@ -358,8 +361,9 @@ import kotlin.math.roundToInt
             Text("${if (weekly) "この週 " else ""}${visibleItems.size}件 · 予定 ${hoursText(visibleItems.sumOf { it.duration })} · 実績 ${hoursText(visibleItems.sumOf { it.actual })}",
                 style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        val activeDates = if (weekly) listOf(week.plusDays(dayOffset.toLong())) else dates.filter { it >= LocalDate.now() }
-        if (activeDates.isEmpty()) item { EmptyMessage("この条件の予定はありません", "予定を追加") { edit("") } }
+        if (planMode == "grid") item { WeekTimeGrid(data, items, exams, week, edit, editExam) }
+        val activeDates = if (planMode == "grid") emptyList() else if (weekly) listOf(week.plusDays(dayOffset.toLong())) else dates.filter { it >= LocalDate.now() }
+        if (activeDates.isEmpty() && planMode != "grid") item { EmptyMessage("この条件の予定はありません", "予定を追加") { edit("") } }
         fun LazyListScope.day(date: LocalDate) {
             item(key = "date-$date") { Text(date.format(DateTimeFormatter.ofPattern("M月d日（E）", java.util.Locale.JAPANESE)), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)) }
             val dayItems = items.filter { it.date == date }.sortedBy { it.datetime }
@@ -571,11 +575,11 @@ private fun timerText(milliseconds: Long): String {
 
 @Composable private fun MoreScreen(navigate: (String) -> Unit) {
     val icons = mapOf("timer" to Icons.Default.PlayArrow, "wake" to Icons.Default.DateRange, "subjects" to Icons.AutoMirrored.Filled.List, "settings" to Icons.Default.Settings,
-        "backup" to Icons.Default.Share, "help" to Icons.Default.Info)
-    LazyColumn(contentPadding = PaddingValues(20.dp)) {
-        item { PageTitle("その他") }
-        items(listOf(Triple("timer", "集中タイマー", "予定を作らず、そのまま勉強を始める"), Triple("wake", "目覚まし", "計算問題とNFCタグで、2段階解除"), Triple("subjects", "教科", "教科の追加・編集・並び替え"),
-            Triple("settings", "通知設定", "タイマー終了・学習予定・試験の通知"), Triple("backup", "バックアップ", "別の端末へ引き継ぐ・ファイルに保存"), Triple("help", "使い方", "初めての方へ・操作ガイド"))) { (key, title, description) ->
+        "widget" to Icons.Default.Home, "backup" to Icons.Default.Share, "help" to Icons.Default.Info)
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+        PageTitle("その他")
+        listOf(Triple("timer", "集中タイマー", "予定を作らず、そのまま勉強を始める"), Triple("wake", "目覚まし", "計算問題とNFCタグで、2段階解除"), Triple("subjects", "教科", "教科の追加・編集・並び替え"),
+            Triple("widget", "ウィジェット", "今日の予定と勉強時間をホーム画面に"), Triple("settings", "通知設定", "タイマー終了・学習予定・試験の通知"), Triple("backup", "バックアップ", "別の端末へ引き継ぐ・ファイルに保存"), Triple("help", "使い方", "初めての方へ・操作ガイド")).forEach { (key, title, description) ->
             Card(onClick = { navigate(key) }, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 ListItem(headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) }, supportingContent = { Text(description, style = MaterialTheme.typography.bodySmall) },

@@ -42,6 +42,7 @@ class MainActivity : JapaneseActivity() {
     override fun onStop() { model.suspendTicks(); super.onStop() }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleNotification(intent) }
     private fun handleNotification(intent: Intent) {
+        if (intent.getBooleanExtra("openToday", false)) model.requestedScreen.value = "today"
         if (intent.getBooleanExtra("openWakeAlarms", false)) model.requestedScreen.value = "wake"
         if (intent.hasExtra("openTimer")) model.requestedScreen.value = if (intent.getBooleanExtra("openTimer", false)) "timer" else "today"
     }

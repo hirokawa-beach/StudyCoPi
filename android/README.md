@@ -5,9 +5,9 @@ Android 8.0（API 26）以降に対応します。Web版はリポジトリ直下
 
 ## ダウンロード
 
-[StudyCoPi Android 1.3.0 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.3.0/StudyCoPi-Android-1.3.0.apk) をダウンロードして、Android端末で開いてください。
+[StudyCoPi Android 1.4.0 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.4.0/StudyCoPi-Android-1.4.0.apk) をダウンロードして、Android端末で開いてください。
 インストール元のブラウザやファイルアプリに「不明なアプリのインストール」の許可が必要な場合があります。
-開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.3.0) にあります。
+開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.4.0) にあります。
 
 ## 機能
 
@@ -21,6 +21,18 @@ Android 8.0（API 26）以降に対応します。Web版はリポジトリ直下
 - 教科の追加・編集・色・並び替え
 - 学習予定の開始前・試験前日・タイマー終了のAndroid通知
 - JSONバックアップの保存・復元（Web版のv3と旧形式を読み込み可能）
+
+## 音源・時間割・ウィジェット（1.4）
+
+- WebとAndroidでベル・電子音・チャイムの3種類を選択・試聴できます。同じオリジナルWAV音源を共有します。
+- Androidの目覚ましでは端末の標準音と音声ファイルも選択できます。別の端末へ復元すると端末固有の音源は標準音に戻ります。
+- Webの音源設定は「その他 → 通知設定 → アラーム音」にあります。画面を開いている間のタイマー終了音に適用します。
+- Webのホーム画面・ブラウザ・通知アイコンをAndroid版と統一しました。
+- Webは最後のバックアップから3日以上経ち、変更がある場合だけ、次に開いた際にバックアップを案内します。「あとで」は24時間の延期です。初回は利用開始から3日を基準にします。
+- 両方の「予定 → 時間割」で縦軸が時間の週間表を開けます。短い予定の枠は教科名に合わせて伸び、表示が重なる予定は横に並びます。枠の先頭は実際の開始時刻です。
+- Androidの「その他 → ウィジェット」で、今日の予定3件と記録済みの勉強時間をホーム画面に追加できます。保存時に更新され、↻でも更新できます。
+
+音源の原本は `shared/sounds/`、生成コードは `scripts/generate-sounds.py` にあります。WebはService Worker、AndroidはAPK assetsに保存するため、オフラインでも利用できます。
 
 ## チュートリアルと共通UI（1.3）
 
