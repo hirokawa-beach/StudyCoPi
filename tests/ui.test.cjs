@@ -220,7 +220,7 @@ const url = process.env.STUDYCOPI_TEST_URL || 'http://127.0.0.1:8765';
   fallback.on('pageerror', (e) => errors.push(e.message));
   await fallback.goto(url);
   await fallback.waitForSelector('.today-summary strong');
-  await fallback.evaluate(() => { showView('focus'); document.getElementById('focus-minutes').value = 1; startFocus(); focusStart = Date.now()-120000; tickFocus(); stopFocus(); });
+  await fallback.evaluate(() => { showView('focus'); document.getElementById('focus-minutes').value = 1; startFocus(); focusStart = performance.now()-120000; tickFocus(); stopFocus(); });
   assert.equal(await fallback.evaluate(() => schedules.length),1);
   assert.equal(await fallback.evaluate(() => Math.round(schedules[0].actualDuration*60)),1);
   assert.deepEqual(errors,[]);

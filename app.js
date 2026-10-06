@@ -124,12 +124,16 @@ function populateExamFilters() {
 function getPeriodRange() {
   const preset = document.getElementById("hours-period-preset").value;
   const now = new Date();
+  if (preset === 'week') now.setDate(now.getDate() + hoursPeriodOffset * 7);
+  if (preset === 'month') { now.setDate(1); now.setMonth(now.getMonth() + hoursPeriodOffset); }
+  if (preset === 'year') now.setFullYear(now.getFullYear() + hoursPeriodOffset);
   if (preset === "week") {
     const from = StudyModel.weekStart(now), to = new Date(from);
     to.setDate(to.getDate() + 7);
     return { from, to };
   }
   if (preset === "month") return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
+  if (preset === 'year') return { from: new Date(now.getFullYear(), 0, 1), to: new Date(now.getFullYear() + 1, 0, 1) };
   if (preset === "custom") {
     const f = document.getElementById("hours-from").value, t = document.getElementById("hours-to").value;
     const to = t ? new Date(t + "T00:00:00") : null;
@@ -629,6 +633,10 @@ function onDrop(e, toIdx) {
 }
 
 // ── Hours ─────────────────────────────────────────────
+let hoursPeriodOffset = 0;
+let heatmapYear = new Date().getFullYear();
+function shiftHoursPeriod(offset) { hoursPeriodOffset += offset; renderHours(); }
+function shiftHeatmapYear(offset) { heatmapYear += offset; renderHours(); }
 function setHoursMode(mode) {
   hoursMode = mode;
   document
@@ -639,6 +647,7 @@ function setHoursMode(mode) {
 }
 
 function onPeriodPresetChange() {
+  hoursPeriodOffset = 0;
   const val = document.getElementById("hours-period-preset").value;
   const wrap = document.getElementById("hours-custom-range");
   wrap.style.display = val === "custom" ? "flex" : "none";
@@ -651,6 +660,9 @@ function renderHours() {
   const invalidRange = range.from && range.to && range.from >= range.to;
   const inRange = invalidRange ? [] : filterByPeriod(StudyModel.forExam(schedules, groupId), range);
   const total = StudyModel.totals(inRange);
+  const navigable = ['week', 'month', 'year'].includes(document.getElementById('hours-period-preset').value);
+  document.getElementById('hours-period-nav').hidden = !navigable;
+  document.getElementById('hours-period-label').textContent = navigable ? `${StudyModel.localDate(range.from)} 〜 ${StudyModel.localDate(new Date(range.to.getTime() - 1))}` : '';
   document.getElementById("hours-context").textContent = invalidRange ? "終了日は開始日以降を選んでください。" : `${groupId ? groupId === "unassigned" ? "試験未指定の学習" : groupName(groupId) : "すべての学習"} · ${inRange.length}件の記録（対象の試験と期間の両方で絞り込み）`;
   document.getElementById("hours-stats").innerHTML = `<div class="stat-card"><div class="stat-label">勉強した時間</div><div class="stat-value">${durationText(total.actual)}</div></div><div class="stat-card"><div class="stat-label">予定時間</div><div class="stat-value">${durationText(total.planned)}</div></div><div class="stat-card"><div class="stat-label">完了した予定</div><div class="stat-value">${total.done}<span class="stat-unit"> / ${total.count}件</span></div></div>`;
   const rows = subjects.map((subject) => ({ subject, ...StudyModel.totals(inRange.filter((s) => s.subjectId === subject.id)) }));
@@ -658,6 +670,53 @@ function renderHours() {
   if (unknown.length) rows.push({ subject: {name:"削除された教科", color:"#68736c"}, ...StudyModel.totals(unknown) });
   const max = Math.max(...rows.map((r) => Math.max(r.actual, r.planned)), 0.1);
   document.getElementById("hours-list").innerHTML = inRange.length ? rows.map((r) => `<div class="hours-row"><div class="hours-row-title"><strong>${esc(r.subject.name)}</strong><span>${r.count}件</span></div>${hoursMode !== "planned" ? `<div class="hours-measure"><span>実績</span><div class="hours-track"><div style="width:${r.actual/max*100}%;background:var(--accent)"></div></div><strong>${durationText(r.actual)}</strong></div>` : ""}${hoursMode !== "actual" ? `<div class="hours-measure"><span>予定</span><div class="hours-track"><div style="width:${r.planned/max*100}%;background:var(--border2)"></div></div><strong>${durationText(r.planned)}</strong></div>` : ""}</div>`).join("") : '<p class="empty-state">この条件の学習記録はまだありません。</p>';
+  renderTimeHistory(inRange, range, invalidRange);
+}
+
+function renderTimeHistory(items, range, invalid) {
+  const unit = document.getElementById('hours-bucket').value;
+  const earliest = items.reduce((date, s) => Math.min(date, new Date(s.datetime).getTime()), Infinity);
+  const latest = items.reduce((date, s) => Math.max(date, new Date(s.datetime).getTime()), Date.now());
+  const from = range.from || (items.length ? new Date(earliest) : new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  from.setHours(0, 0, 0, 0);
+  const to = range.to || new Date(latest);
+  if (!range.to) { to.setHours(0, 0, 0, 0); to.setDate(to.getDate() + 1); }
+  const allBuckets = invalid ? [] : StudyModel.timeBuckets(items, from, to, unit);
+  const buckets = allBuckets.slice(-366);
+  const max = Math.max(1, ...buckets.map(b => Math.max(b.actual, b.planned)));
+  const label = b => unit === 'month' ? b.date.slice(0, 7) : b.date.slice(5).replace('-', '/') + (unit === 'week' ? '週' : '');
+  document.getElementById('hours-chart-range').textContent = buckets.length ? `${buckets[0].date} 〜 ${StudyModel.localDate(new Date(to.getTime() - 1))}（最大366区間）` : '表示できる期間がありません';
+  document.getElementById('hours-chart').innerHTML = buckets.map(b => `<button type="button" class="history-column" title="${b.date} 実績 ${durationText(b.actual)}・予定 ${durationText(b.planned)}" aria-label="${b.date} 実績 ${durationText(b.actual)}・予定 ${durationText(b.planned)}" onclick="showHistoryDetail('${b.date}',${b.actual},${b.planned})"><span class="history-bars"><i class="history-actual" style="height:${b.actual / max * 100}%"></i><i class="history-planned" style="height:${b.planned / max * 100}%"></i></span><span>${label(b)}</span></button>`).join('');
+  document.getElementById('hours-history-detail').textContent = '棒や日付のマスを選ぶと、勉強時間を確認できます。';
+  document.getElementById('hours-chart-table').innerHTML = `<table><caption>時間の推移（単位：時間）</caption><thead><tr><th scope="col">期間の開始日</th><th scope="col">実績</th><th scope="col">予定</th></tr></thead><tbody>${buckets.map(b => `<tr><th scope="row">${b.date}</th><td>${durationText(b.actual)}</td><td>${durationText(b.planned)}</td></tr>`).join('')}</tbody></table>`;
+  const days = StudyModel.dailyTotals(items);
+  const rolling = document.getElementById('hours-heat-mode').value === 'rolling';
+  const {from: first, to: last, start, end} = StudyModel.activityRange(new Date(), rolling ? null : heatmapYear);
+  let cells = '', months = '', active = 0, hours = 0, index = 0;
+  for (let date = new Date(start); date < end; date.setDate(date.getDate() + 1)) {
+    const column = Math.floor(index++ / 7) + 1;
+    if (date >= first && date < last && (date.getDate() === 1 || date.getTime() === first.getTime())) months += `<span style="grid-column:${column}">${date.getMonth() + 1}月</span>`;
+    const key = StudyModel.localDate(date), total = days.get(key) || {actual: 0, planned: 0};
+    if (date < first || date >= last) { cells += '<span class="heat-cell outside"></span>'; continue; }
+    const excluded = invalid || range.from && date < range.from || range.to && date >= range.to;
+    if (!excluded) { if (total.actual > 0) active++; hours += total.actual; }
+    cells += `<button type="button" class="heat-cell level-${StudyModel.heatLevel(total.actual)}${excluded ? ' excluded' : ''}" ${excluded ? 'disabled' : ''} title="${key} ${excluded ? '集計期間外' : durationText(total.actual)}" aria-label="${key} ${excluded ? '集計期間外' : '実績 ' + durationText(total.actual)}" onclick="showHistoryDetail('${key}',${total.actual},${total.planned})"></button>`;
+  }
+  document.getElementById('hours-heat-year').textContent = `${heatmapYear}年`;
+  document.getElementById('hours-heat-nav').hidden = rolling;
+  document.getElementById('hours-heatmap').innerHTML = cells;
+  const heatScroll = document.querySelector('.heat-scroll');
+  const weeks = index / 7;
+  const available = heatScroll.clientWidth - 36;
+  const cellSize = available >= weeks * 10 + (weeks - 1) * 4 ? Math.min(16, Math.floor((available - (weeks - 1) * 4) / weeks)) : 14;
+  heatScroll.style.setProperty('--heat-size', `${cellSize}px`);
+  document.getElementById('hours-heat-months').style.gridTemplateColumns = `repeat(${weeks},var(--heat-size,14px))`;
+  document.getElementById('hours-heat-months').innerHTML = months;
+  heatScroll.scrollLeft = rolling ? heatScroll.scrollWidth : 0;
+  document.getElementById('hours-heat-summary').textContent = `${rolling ? '直近1年' : heatmapYear + '年'} · 勉強した日 ${active}日 · 実績 ${durationText(hours)}（選択中の試験・期間）`;
+}
+function showHistoryDetail(date, actual, planned) {
+  document.getElementById('hours-history-detail').textContent = `${date} · 実績 ${durationText(actual)} / 予定 ${durationText(planned)}`;
 }
 
 // ── Focus mode ────────────────────────────────────────
@@ -722,7 +781,7 @@ function startFocus() {
     (parseInt(document.getElementById("focus-minutes").value) || 25) * 60;
   focusElapsed = 0;
   focusPaused = false;
-  focusStart = Date.now();
+  focusStart = performance.now();
 
   document.getElementById("focus-setup").style.display = "none";
   document.getElementById("focus-active").style.display = "flex";
@@ -730,7 +789,7 @@ function startFocus() {
   document.getElementById("focus-active-subject").textContent = subj.name;
 
   clearInterval(focusTimer);
-  focusTimer = setInterval(tickFocus, 500);
+  focusTimer = setInterval(tickFocus, 100);
   tickFocus();
 
   document.body.classList.add("timer-running");
@@ -744,31 +803,30 @@ function startFocus() {
 function tickFocus() {
   const nowElapsed = focusPaused
     ? focusElapsed
-    : focusElapsed + Math.floor((Date.now() - focusStart) / 1000);
-  const remaining = Math.max(0, focusTargetSec - nowElapsed);
+    : focusElapsed + (performance.now() - focusStart) / 1000;
+  const remainingExact = Math.max(0, focusTargetSec - nowElapsed);
+  const remaining = Math.ceil(remainingExact);
   const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
   const ss = String(remaining % 60).padStart(2, "0");
   const display = `${mm}:${ss}`;
-  const progress = 1 - remaining / focusTargetSec;
+  const progress = 1 - remainingExact / focusTargetSec;
   const circumference = 339.3;
   const offset = circumference * (1 - progress);
 
-  document.getElementById("focus-timer-display").textContent = display;
+  const text = (id, value) => { const element = document.getElementById(id); if (element && element.textContent !== value) element.textContent = value; };
+  text("focus-timer-display", display);
   document.getElementById("running-focus").hidden = false;
-  document.getElementById("running-focus-time").textContent = display;
-  document.getElementById("running-focus-label").textContent = focusPaused ? "一時停止中" : subjectById(focusSubjectId).name;
-  document.getElementById("focus-elapsed").textContent =
-    `経過: ${Math.floor(nowElapsed / 60)}分`;
+  text("running-focus-time", display);
+  text("running-focus-label", focusPaused ? "一時停止中" : subjectById(focusSubjectId).name);
+  text("focus-elapsed", `経過: ${Math.floor(nowElapsed / 60)}分`);
   const ring = document.getElementById("focus-ring");
   if (ring) ring.setAttribute("stroke-dashoffset", offset);
 
   // Fullscreen display
-  const fst = document.getElementById("focus-fs-timer");
-  const fse = document.getElementById("focus-fs-elapsed");
-  if (fst) fst.textContent = display;
-  if (fse) fse.textContent = `経過: ${Math.floor(nowElapsed / 60)}分`;
+  text("focus-fs-timer", display);
+  text("focus-fs-elapsed", `経過: ${Math.floor(nowElapsed / 60)}分`);
 
-  if (remaining <= 0) {
+  if (remainingExact <= 0) {
     clearInterval(focusTimer);
     finishFocusAuto(nowElapsed);
   }
@@ -781,9 +839,9 @@ function pauseFocus() {
 
   if (focusPaused) {
     // 再開
-    focusStart = Date.now();
+    focusStart = performance.now();
     focusPaused = false;
-    focusTimer = setInterval(tickFocus, 500);
+    focusTimer = setInterval(tickFocus, 100);
     [btn, btnFs].forEach((b) => {
       if (!b) return;
       b.textContent = "一時停止";
@@ -791,7 +849,7 @@ function pauseFocus() {
     });
   } else {
     // 一時停止
-    focusElapsed += Math.floor((Date.now() - focusStart) / 1000);
+    focusElapsed += (performance.now() - focusStart) / 1000;
     focusPaused = true;
     clearInterval(focusTimer);
     [btn, btnFs].forEach((b) => {
@@ -807,7 +865,7 @@ function stopFocus() {
   if (document.getElementById("focus-active").style.display === "none") return;
   const nowElapsed = focusPaused
     ? focusElapsed
-    : focusElapsed + Math.floor((Date.now() - focusStart) / 1000);
+    : focusElapsed + (performance.now() - focusStart) / 1000;
   clearInterval(focusTimer);
   exitFullscreenOverlay();
   recordFocusSession(nowElapsed);

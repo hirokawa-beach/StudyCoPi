@@ -154,6 +154,7 @@
               <option value="all">すべての期間</option>
               <option value="week">今週</option>
               <option value="month">今月</option>
+              <option value="year">今年</option>
               <option value="custom">期間を指定</option>
             </select>
           </div>
@@ -163,9 +164,26 @@
             <input type="date" id="hours-to" aria-label="集計終了日" onchange="renderHours()" style="width:auto">
           </div>
         </div>
+        <div id="hours-period-nav" class="history-toolbar" hidden><button class="btn" onclick="shiftHoursPeriod(-1)" aria-label="前の期間">前へ</button><span id="hours-period-label"></span><button class="btn" onclick="shiftHoursPeriod(1)" aria-label="次の期間">次へ</button></div>
       </div>
       <p class="muted" id="hours-context"></p>
       <div class="stats-grid" id="hours-stats"></div>
+      <div class="card history-card">
+        <div class="history-toolbar"><h2 class="section-title">勉強時間の推移</h2><label>集計単位 <select id="hours-bucket" onchange="renderHours()"><option value="day">日ごと</option><option value="week">週ごと</option><option value="month" selected>月ごと</option></select></label></div>
+        <p id="hours-chart-range" class="muted"></p>
+        <div class="history-legend"><span><i class="history-actual"></i>実績</span><span><i class="history-planned"></i>予定</span></div>
+        <div class="history-scroll" tabindex="0" aria-label="勉強時間のグラフ。横にスクロールできます"><div id="hours-chart" class="history-chart"></div></div>
+        <details class="history-table"><summary>グラフの数値を表で見る</summary><div id="hours-chart-table"></div></details>
+      </div>
+      <div class="card history-card">
+        <div class="history-toolbar"><h2 class="section-title">学習のヒートマップ</h2><label>表示期間 <select id="hours-heat-mode" onchange="renderHours()"><option value="rolling">直近1年</option><option value="year">年ごと</option></select></label></div>
+        <div class="history-toolbar" id="hours-heat-nav" hidden><button class="btn" onclick="shiftHeatmapYear(-1)" aria-label="前年のヒートマップ">前年</button><strong id="hours-heat-year"></strong><button class="btn" onclick="shiftHeatmapYear(1)" aria-label="翌年のヒートマップ">翌年</button></div>
+        <p id="hours-heat-summary" class="muted"></p>
+        <div class="heat-scroll" tabindex="0" aria-label="年間の学習日。横にスクロールできます"><div class="heat-layout"><div class="heat-weekdays" aria-hidden="true"><span></span><span>月</span><span></span><span>水</span><span></span><span>金</span><span></span></div><div><div id="hours-heat-months" class="heat-months" aria-hidden="true"></div><div id="hours-heatmap" class="heatmap"></div></div></div></div>
+        <div class="heat-legend" aria-label="濃さは0分、30分未満、1時間未満、2時間未満、2時間以上の5段階"><span>少ない</span><i class="heat-cell level-0" title="0分"></i><i class="heat-cell level-1" title="30分未満"></i><i class="heat-cell level-2" title="1時間未満"></i><i class="heat-cell level-3" title="2時間未満"></i><i class="heat-cell level-4" title="2時間以上"></i><span>多い</span></div>
+        <p id="hours-history-detail" class="history-detail" aria-live="polite"></p>
+        <p class="muted">実績は予定の開始日に集計します。薄いマスは選択した期間の対象外です。</p>
+      </div>
       <div class="card">
         <div class="section-title" style="margin-bottom:16px">教科ごとの時間</div>
         <div class="hours-toggle-row" hidden>
@@ -252,7 +270,7 @@
     <section id="view-about" class="view about-view">
       <h1 class="view-title">StudyCoPiについて</h1>
       <img src="icons/app-icon-192.png" alt="StudyCoPiのアイコン" width="88" height="88">
-      <h2>StudyCoPi</h2><p>バージョン <strong data-app-version>1.4.1</strong> · Web版</p>
+      <h2>StudyCoPi</h2><p>バージョン <strong data-app-version>1.5.0</strong> · Web版</p>
       <p>予定を立てて、勉強して、振り返る。試験ごとの学習を続けるためのアプリです。</p>
       <section class="card"><h2 class="section-title">開発者</h2><p>ひろかわびーち（hirokawa-beach）</p><p class="muted">ライセンス：MIT</p></section>
       <p class="muted">学習データはこのブラウザに保存されます。自動同期はありません。端末の変更や削除に備えて、バックアップを保存してください。</p>

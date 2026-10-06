@@ -1,4 +1,4 @@
-const CACHE_NAME = "studycopi-v9";
+const CACHE_NAME = "studycopi-v1.5.0";
 const ASSETS = [
   "./",
   "./index.html",

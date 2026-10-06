@@ -62,8 +62,8 @@ class ScheduledFocusFlowTest {
         compose.onNodeWithText("画面固定を開始").performScrollTo().performClick()
         compose.runOnIdle {
             shadowOf(app.getSystemService(ActivityManager::class.java)).setLockTaskModeState(ActivityManager.LOCK_TASK_MODE_PINNED)
-            compose.activity.onWindowFocusChanged(true)
         }
+        compose.waitUntil(15000) { compose.onAllNodesWithText("画面固定中").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("画面固定中").performScrollTo().assertIsDisplayed()
         val bitmap = compose.runOnIdle {
             val view = compose.activity.window.decorView

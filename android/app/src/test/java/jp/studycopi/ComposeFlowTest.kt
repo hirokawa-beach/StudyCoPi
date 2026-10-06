@@ -20,6 +20,27 @@ import java.time.LocalDate
 @Config(sdk = [35], qualifiers = "w390dp-h844dp", application = StudyApplication::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ComposeFlowTest {
+    @Test fun historyGraphsAndGitHubCalendarCanBeExplored() {
+        val app = ApplicationProvider.getApplicationContext<StudyApplication>()
+        val today = LocalDate.now()
+        runBlocking { app.repository.restore(StudyData(schedules = (0..18).map { index ->
+            Schedule("day-$index", "s1", "${today.minusDays(index * 3L)}T17:00", 2.0, actualDuration = (index % 5) * .5, status = "partial")
+        })) }
+        compose.onNodeWithText("統計", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("月ごと").performScrollTo().performClick()
+        compose.onNodeWithText("週ごと").performClick()
+        compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("学習のヒートマップ"))
+        compose.onNodeWithText("学習のヒートマップ").assertIsDisplayed()
+        compose.onNodeWithText("直近1年").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("少ない").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("$today 実績 0分").performClick()
+        compose.onNodeWithText("$today · 実績 0分 / 予定 2時間").performScrollTo().assertIsDisplayed()
+        capture("statistics-heatmap-390.png")
+        compose.onNodeWithText("直近1年").performScrollTo().performClick()
+        compose.onNodeWithText("年ごと").performClick()
+        compose.onNodeWithText("前年").performScrollTo().performClick()
+        compose.onNodeWithText("${today.year - 1}年").assertIsDisplayed()
+    }
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private fun ready() { compose.waitUntil(15_000) { compose.onAllNodesWithText("今日の学習").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("study-guide").fetchSemanticsNodes().isNotEmpty() } }
     @Before fun resetData() {
@@ -102,7 +123,7 @@ class ComposeFlowTest {
         ready()
         compose.onNodeWithText("その他", useUnmergedTree = true).performClick()
         compose.onNodeWithText("StudyCoPiについて").performScrollTo().performClick()
-        compose.onNodeWithText("バージョン 1.4.1 · Android版").assertIsDisplayed()
+        compose.onNodeWithText("バージョン 1.5.0 · Android版").assertIsDisplayed()
         compose.onNodeWithText("ひろかわびーち（hirokawa-beach）").assertExists()
         capture("about-native.png")
         compose.onNodeWithContentDescription("戻る").performClick()

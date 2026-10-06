@@ -13,12 +13,12 @@ enum class WidgetKind(val title: String, val sizes: String, val route: String) {
     ALARM("次の目覚まし", "2×1・2×2", "wake"),
     NEXT("次の学習予定", "4×1・4×2", "plans")
 }
-data class WidgetPresentation(val title: String, val label: String, val value: String, val rows: List<String>, val empty: String, val more: String)
+data class WidgetPresentation(val title: String, val label: String, val value: String, val rows: List<String>, val empty: String, val more: String, val visual: WidgetVisual? = null)
 fun widgetPresentation(data: StudyData, kind: WidgetKind, now: LocalDateTime = LocalDateTime.now()): WidgetPresentation {
     val content = widgetContent(data, now.toLocalDate())
     val todayPlans = data.schedules.filter { it.date == now.toLocalDate() && !it.finished }
     val todayExams = data.exams.count { it.date == now.toLocalDate().toString() }
-    return when (kind) {
+    val presentation = when (kind) {
         WidgetKind.TODAY -> WidgetPresentation(content.date, "今日の勉強時間 · 記録済み", content.studied, content.rows,
             "今日の予定はありません", if (content.remaining > 0) "ほか${content.remaining}件 · 今日を開く ›" else "今日の学習を開く ›")
         WidgetKind.PLANS -> WidgetPresentation(kind.title, content.date, "${todayPlans.size + todayExams}件", content.rows,
@@ -39,6 +39,7 @@ fun widgetPresentation(data: StudyData, kind: WidgetKind, now: LocalDateTime = L
                 plan?.let { listOf("${hoursText(it.duration)}  ${it.content}") } ?: emptyList(), "", "予定を開く ›")
         }
     }
+    return presentation.copy(visual = widgetVisual(data, kind, now.toLocalDate()))
 }
 
 class TodayPlansWidget : StudyWidget() { override val kind = WidgetKind.PLANS }

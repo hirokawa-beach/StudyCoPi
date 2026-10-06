@@ -24,6 +24,8 @@ class FocusActivity : JapaneseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); enableEdgeToEdge()
         model = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory(application))[StudyViewModel::class.java]
+        refreshPin()
+        observeScreenPin(::refreshPin)
         setContent { StudyTheme {
             val data by model.data.collectAsState()
             val point by model.now.collectAsState()
@@ -47,7 +49,7 @@ class FocusActivity : JapaneseActivity() {
                         val seconds = (timer.remaining(point) + 999) / 1000
                         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                             Column(Modifier.fillMaxWidth().padding(vertical = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("%02d:%02d".format(seconds / 60, seconds % 60), style = MaterialTheme.typography.displayMedium)
+                                Text("%02d:%02d".format(seconds / 60, seconds % 60), style = MaterialTheme.typography.displayMedium.copy(fontFeatureSettings = "tnum"))
                                 Text(if (timer.paused) "一時停止中" else "残り時間", style = MaterialTheme.typography.labelMedium)
                             }
                         }
@@ -70,12 +72,14 @@ class FocusActivity : JapaneseActivity() {
         } }
     }
     private fun pin() {
+        refreshPin()
+        if (pinned) return
         if (getSystemService(KeyguardManager::class.java).isKeyguardLocked) { status = "端末のロックを解除してから固定してください"; return }
         runCatching { startLockTask(); status = "確認画面が出ない場合は、Androidの「アプリの固定」を有効にしてください"; refreshPin() }
             .onFailure { status = "画面固定を開始できません。Androidの設定を確認してください" }
     }
     private fun refreshPin() {
-        pinned = getSystemService(ActivityManager::class.java).lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE
+        pinned = isScreenPinned()
         if (pinned && status.startsWith("確認画面が出ない場合")) status = ""
     }
     private fun releasePin() { runCatching { if (getSystemService(ActivityManager::class.java).lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) stopLockTask() }; pinned = false }

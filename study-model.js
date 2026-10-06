@@ -25,6 +25,56 @@
     d.setHours(0, 0, 0, 0);
     return d;
   }
+  // Calendar boundaries use local dates, including offset timestamps and DST days.
+  function dailyTotals(items) {
+    const days = new Map();
+    for (const item of items) {
+      const key = localDate(item.datetime);
+      const day = days.get(key) || { date: key, planned: 0, actual: 0, count: 0, done: 0 };
+      day.planned += Number(item.duration) || 0;
+      day.actual += actualHours(item);
+      day.count++;
+      if (item.status === 'done') day.done++;
+      days.set(key, day);
+    }
+    return days;
+  }
+  function timeBuckets(items, from, to, unit = 'day') {
+    if (!from || !to || from >= to) return [];
+    const days = dailyTotals(items);
+    const start = new Date(from);
+    start.setHours(0, 0, 0, 0);
+    let cursor = unit === 'week' ? weekStart(start) : unit === 'month' ? new Date(start.getFullYear(), start.getMonth(), 1) : start;
+    const last = new Date(to.getTime() - 1);
+    const oldest = unit === 'month' ? new Date(last.getFullYear(), last.getMonth() - 365, 1) : unit === 'week' ? weekStart(last) : new Date(last);
+    if (unit !== 'month') { oldest.setHours(0, 0, 0, 0); oldest.setDate(oldest.getDate() - (unit === 'week' ? 365 * 7 : 365)); }
+    if (cursor < oldest) cursor = oldest;
+    const buckets = [];
+    while (cursor < to) {
+      const end = new Date(cursor);
+      if (unit === 'month') end.setMonth(end.getMonth() + 1);
+      else end.setDate(end.getDate() + (unit === 'week' ? 7 : 1));
+      const bucket = { date: localDate(cursor), end: localDate(end), planned: 0, actual: 0, count: 0 };
+      for (const day = new Date(cursor); day < end && day < to; day.setDate(day.getDate() + 1)) {
+        if (day < from) continue;
+        const total = days.get(localDate(day));
+        if (total) { bucket.planned += total.planned; bucket.actual += total.actual; bucket.count += total.count; }
+      }
+      buckets.push(bucket);
+      cursor = end;
+    }
+    return buckets;
+  }
+  const heatLevel = (hours) => hours <= 0 ? 0 : hours < .5 ? 1 : hours < 1 ? 2 : hours < 2 ? 3 : 4;
+  function activityRange(value = new Date(), year = null) {
+    const today = new Date(value);
+    const previousMonthLastDay = new Date(today.getFullYear() - 1, today.getMonth() + 1, 0).getDate();
+    const from = year === null ? new Date(today.getFullYear() - 1, today.getMonth(), Math.min(today.getDate(), previousMonthLastDay) + 1) : new Date(year, 0, 1);
+    const to = year === null ? new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1) : new Date(year + 1, 0, 1);
+    const start = new Date(from); start.setDate(start.getDate() - start.getDay());
+    const end = new Date(to.getTime() - 1); end.setHours(0, 0, 0, 0); end.setDate(end.getDate() + 7 - end.getDay());
+    return {from, to, start, end};
+  }
   function validateBackup(data) {
     if (!data || ![data.subjects, data.schedules, data.exams].every(Array.isArray)
       || (data.examGroups !== undefined && !Array.isArray(data.examGroups))) throw new Error("バックアップの形式が正しくありません");
@@ -48,7 +98,7 @@
       || [e.startTime, e.endTime].some((t) => t && !/^([01]\d|2[0-3]):[0-5]\d$/.test(t)))) throw new Error("教科別日程が不正です");
     return { subjects: data.subjects, schedules: data.schedules, exams: data.exams, examGroups: groups };
   }
-  const api = { actualHours, totals, forExam, localDate, weekStart, validateBackup };
+  const api = { actualHours, totals, forExam, localDate, weekStart, dailyTotals, timeBuckets, heatLevel, activityRange, validateBackup };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.StudyModel = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

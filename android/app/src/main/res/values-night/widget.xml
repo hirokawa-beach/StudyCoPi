@@ -1,4 +1,6 @@
 <resources>
-    <color name="widget_surface">#10181B</color><color name="widget_text">#DEE5E8</color>
-    <color name="widget_secondary">#BEC8CA</color><color name="widget_accent">#9BCDD3</color>
+    <color name="widget_surface">#141D2B</color><color name="widget_text">#F2F2F2</color>
+    <color name="widget_secondary">#CCCCCC</color><color name="widget_accent">#99B3FF</color>
+    <color name="widget_border">#334155</color>
+    <color name="widget_track">#28354B</color><color name="widget_chart">#99B3FF</color><color name="widget_chart_past">#536DAB</color>
 </resources>

@@ -31,6 +31,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import java.time.*
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -453,62 +457,7 @@ import kotlin.math.roundToInt
 }
 
 @Composable private fun StatsScreen(data: StudyData, examFilter: String, filter: (String) -> Unit) {
-    var period by rememberSaveable { mutableStateOf("all") }
-    var from by rememberSaveable { mutableStateOf(weekStart(LocalDate.now()).toString()) }
-    var to by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
-    val today = LocalDate.now()
-    val list = data.forExam(examFilter).filter {
-        when (period) {
-            "week" -> it.date in weekStart(today)..weekStart(today).plusDays(6)
-            "month" -> it.date.year == today.year && it.date.month == today.month
-            "custom" -> it.date in LocalDate.parse(from)..LocalDate.parse(to)
-            else -> true
-        }
-    }
-    val planned = list.sumOf { it.duration }; val actual = list.sumOf { it.actual }
-    val max = data.subjects.maxOfOrNull { s -> list.filter { it.subjectId == s.id }.let { maxOf(it.sumOf { it.duration }, it.sumOf { it.actual }) } }?.coerceAtLeast(0.01) ?: 1.0
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp)) {
-        item {
-            PageTitle("学習の統計")
-            Box(Modifier.guideTarget("stats-filter")) { ChoiceField("対象の試験", examFilter, groupChoices(data, all = true), filter) }
-            Spacer(Modifier.height(12.dp))
-            ChoiceField("期間", period, listOf("all" to "すべての期間", "week" to "今週", "month" to "今月", "custom" to "期間を指定")) { period = it }
-            if (period == "custom") Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DateField("開始日", from, Modifier.weight(1f)) { from = it }; DateField("終了日", to, Modifier.weight(1f)) { to = it }
-            }
-            if (from > to && period == "custom") Text("開始日と終了日を確認してください", color = MaterialTheme.colorScheme.error)
-            Spacer(Modifier.height(20.dp))
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Metric("勉強した時間", hoursText(actual), Modifier.weight(1f)); Metric("予定時間", hoursText(planned), Modifier.weight(1f))
-                    }
-                    Text("${list.size}件の学習記録 · ${list.count { it.status == "done" }}件 完了",
-                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 14.dp))
-                }
-            }
-            Text("教科ごとの時間", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp, bottom = 4.dp))
-        }
-        items(data.subjects, key = { it.id }) { subject ->
-            val records = list.filter { it.subjectId == subject.id }
-            Card(Modifier.fillMaxWidth().padding(top = 12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-              Column(Modifier.padding(18.dp)) {
-                Text(subject.name, style = MaterialTheme.typography.titleMedium)
-                MeasureBar("実績", records.sumOf { it.actual }, max, MaterialTheme.colorScheme.primary)
-                MeasureBar("予定", records.sumOf { it.duration }, max, MaterialTheme.colorScheme.outline)
-              }
-            }
-        }
-        if (list.isEmpty()) item { EmptyMessage("この試験・期間の学習記録はありません") }
-    }
-}
-
-@Composable private fun MeasureBar(label: String, hours: Double, maximum: Double, color: Color) {
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, fontSize = 12.sp)
-        LinearProgressIndicator(progress = { (hours / maximum).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.weight(1f).height(5.dp), color = color, trackColor = MaterialTheme.colorScheme.surfaceVariant)
-        Text(hoursText(hours), fontSize = 12.sp, modifier = Modifier.widthIn(min = 80.dp))
-    }
+    StatisticsScreen(data, examFilter, filter)
 }
 
 private fun timerText(milliseconds: Long): String {
@@ -526,6 +475,12 @@ private fun timerText(milliseconds: Long): String {
     }
     val timer = data.timer
     val context = LocalContext.current
+    var pinned by remember { mutableStateOf(context.isScreenPinned()) }
+    LaunchedEffect(context) {
+        (context as? JapaneseActivity)?.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (isActive) { pinned = context.isScreenPinned(); delay(250) }
+        }
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         PageTitle("集中タイマー")
         if (timer == null) {
@@ -558,7 +513,7 @@ private fun timerText(milliseconds: Long): String {
                     TextButton(onClick = { finishConfirm = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("終了して記録") }
                 }
             }
-            OutlinedButton(onClick = { context.startActivity(Intent(context, FocusActivity::class.java)) }, modifier = Modifier.fillMaxWidth()) { Text("画面を固定して集中") }
+            OutlinedButton(onClick = { context.startActivity(Intent(context, FocusActivity::class.java)) }, modifier = Modifier.fillMaxWidth()) { Text(if (pinned) "固定中の集中画面を開く" else "画面を固定して集中") }
         }
         if (!AlarmScheduler.notificationsAllowed(context)) {
             Text("終了通知は許可されていません。時間の記録は続きます。", fontSize = 13.sp)

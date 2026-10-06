@@ -1,12 +1,17 @@
 <resources>
     <string name="widget_description">今日の予定3件と記録済みの勉強時間。タップして学習を開く。</string>
-    <color name="widget_surface">#F5F7F7</color><color name="widget_text">#172125</color>
-    <color name="widget_secondary">#506166</color><color name="widget_accent">#245D67</color>
+    <!-- DADS-inspired hierarchy: neutral text, blue actions, 8dp spacing. -->
+    <color name="widget_surface">#FFFFFF</color><color name="widget_text">#1A1A1C</color>
+    <color name="widget_secondary">#4D4D4D</color><color name="widget_accent">#0031D8</color>
+    <color name="widget_border">#D2D9E3</color>
+    <color name="widget_track">#EBEFF6</color><color name="widget_chart">#0031D8</color><color name="widget_chart_past">#8CA6ED</color>
     <style name="WidgetRow">
         <item name="android:layout_width">match_parent</item><item name="android:layout_height">wrap_content</item>
-        <item name="android:textSize">13sp</item><item name="android:textColor">@color/widget_text</item>
+        <item name="android:textSize">14sp</item><item name="android:textColor">@color/widget_text</item>
         <item name="android:maxLines">2</item>
         <item name="android:ellipsize">end</item><item name="android:paddingBottom">8dp</item>
+        <item name="android:lineSpacingMultiplier">1.2</item>
+        <item name="android:includeFontPadding">false</item>
     </style>
     <string name="widget_today_plans_description">今日の予定。長押しして大きさを変更できます。</string>
     <string name="widget_today_hours_description">今日の勉強時間。長押しして大きさを変更できます。</string>

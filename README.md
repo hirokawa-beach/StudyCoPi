@@ -4,7 +4,15 @@
 Android版は [android](android/) にあります。Kotlin + Jetpack Composeで実装しています。
 Android Studioで開き、実行・ビルドする方法は [Android版のREADME](android/README.md) を参照してください。
 
-[Android版APK（1.4.1）をダウンロード](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.4.1/StudyCoPi-Android-1.4.1.apk) · [Releaseと変更内容](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.4.1)
+[公開済みのAndroid版APK（1.4.1）をダウンロード](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.4.1/StudyCoPi-Android-1.4.1.apk) · [Releaseと変更内容](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.4.1)
+
+## v1.5.0
+
+Web・Androidの統計に日・週・月単位の勉強時間グラフとGitHub型の学習ヒートマップを追加しました。
+直近1年・年別の表示、週・月・年の前後移動、試験と期間による絞り込み、マスや棒を選んだ時間の確認ができます。
+実績は学習記録の予定開始日に集計し、0分・30分未満・1時間未満・2時間未満・2時間以上の5段階で表示します。
+Androidのホーム画面ウィジェットはデジタル庁デザインシステムを参考に見直し、実績と予定の円グラフ、直近7日の棒グラフ、大きな時刻表示を追加しました。
+画面固定状態の遅延反映と、タイマーの秒表示の周期的な引っ掛かりも修正しています。
 
 ## v1.4.1
 

@@ -32,6 +32,22 @@ class FocusFlowTest {
         }
     }
     @get:Rule val rules: RuleChain = RuleChain.outerRule(seed).around(compose)
+    @Test fun asynchronousPinAndUnpinRefreshWithoutAWindowFocusEvent() {
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("画面固定を開始").fetchSemanticsNodes().isNotEmpty() }
+        compose.runOnIdle {
+            shadowOf(compose.activity.getSystemService(ActivityManager::class.java)).setLockTaskModeState(ActivityManager.LOCK_TASK_MODE_PINNED)
+            assertTrue("OS pin state", compose.activity.isScreenPinned())
+            shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(300))
+        }
+        compose.mainClock.advanceTimeBy(500)
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("画面固定中").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("画面固定を開始").assertDoesNotExist()
+        compose.runOnIdle {
+            shadowOf(compose.activity.getSystemService(ActivityManager::class.java)).setLockTaskModeState(ActivityManager.LOCK_TASK_MODE_NONE)
+            shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(300))
+        }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("画面固定を開始").fetchSemanticsNodes().isNotEmpty() }
+    }
     @Test fun pinPauseAndFinishRecordElapsedTimeAndReleasePin() {
         compose.waitUntil(15_000) { compose.onAllNodesWithText("画面固定を開始").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("画面固定を開始").performClick()

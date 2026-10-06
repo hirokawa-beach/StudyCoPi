@@ -31,12 +31,17 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
     fun resume() {
         ticker?.cancel()
         ticker = viewModelScope.launch {
+            // The boot identifier is constant during this process; avoid a settings IPC on every frame sample.
+            val boot = clockPoint(context).boot
             while (isActive) {
-                now.value = clockPoint(context)
+                now.value = ClockPoint(System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime(), boot)
                 if (ready.value) try { settleTimer() } catch (e: Exception) {
                     eventChannel.send(Notice("勉強時間を保存できませんでした。タイマー画面から再度終了してください")); return@launch
                 }
-                delay(750)
+                // Sample from the clock, never add the polling interval to elapsed time.
+                // 750ms polling made every third second linger before the next change.
+                val interval = if (data.value.timer?.paused == false) 100L else 1000L
+                delay(interval - android.os.SystemClock.elapsedRealtime() % interval)
             }
         }
         if (ready.value) run { repository.update { it.normalizeWakeAlarms(System.currentTimeMillis()) }; reconcile() }

@@ -35,6 +35,8 @@ class ScheduledFocusActivity : JapaneseActivity() {
         attempted = savedInstanceState?.getBoolean("attempted") ?: false
         entered = savedInstanceState?.getBoolean("entered") ?: false
         model = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory(application))[StudyViewModel::class.java]
+        refreshPin()
+        observeScreenPin(::refreshPin)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) { combine(model.ready, model.data) { ready, data -> ready to data }.collect { (ready, data) ->
                 if (!ready) return@collect
@@ -97,10 +99,12 @@ class ScheduledFocusActivity : JapaneseActivity() {
     }
     private fun pin() {
         attempted = true
+        refreshPin()
+        if (pinned) return
         if (getSystemService(KeyguardManager::class.java).isKeyguardLocked) { message = "端末のロックを解除してから固定してください"; return }
         runCatching { startLockTask(); refreshPin() }.onFailure { message = "Androidの「アプリの固定」を有効にしてください" }
     }
-    private fun refreshPin() { pinned = getSystemService(ActivityManager::class.java).lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE }
+    private fun refreshPin() { pinned = isScreenPinned() }
     private fun release() { runCatching { if (getSystemService(ActivityManager::class.java).lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) stopLockTask() }; pinned = false }
     private fun leave() { release(); finish() }
     override fun onWindowFocusChanged(hasFocus: Boolean) { super.onWindowFocusChanged(hasFocus); if (hasFocus && ::model.isInitialized) { refreshPin(); maybePin() } }

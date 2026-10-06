@@ -1,5 +1,5 @@
-/* v1.4.1: a waiting focus screen, never an automatically started study session. */
-const STUDYCOPI_VERSION = '1.4.1';
+/* Version metadata and scheduled focus: study starts only with the user's action. */
+const STUDYCOPI_VERSION = '1.5.0';
 document.querySelectorAll('[data-app-version]').forEach(node => { node.textContent = STUDYCOPI_VERSION; });
 BACKUP_KEYS.add('sl_scheduled_focus');
 let scheduledFocusEnabled = load('sl_scheduled_focus', false) === true;
