@@ -21,9 +21,9 @@ Android 8.0（API 26）以降に対応します。Web版はリポジトリ直下
 
 ## ダウンロード
 
-[StudyCoPi Android 1.4.1 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.4.1/StudyCoPi-Android-1.4.1.apk) をダウンロードして、Android端末で開いてください。
+[StudyCoPi Android 1.5.0 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.5.0/StudyCoPi-Android-1.5.0.apk) をダウンロードして、Android端末で開いてください。
 インストール元のブラウザやファイルアプリに「不明なアプリのインストール」の許可が必要な場合があります。
-開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.4.1) にあります。
+開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.5.0) にあります。
 
 ## 機能
 

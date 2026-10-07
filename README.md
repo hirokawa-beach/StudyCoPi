@@ -4,7 +4,7 @@
 Android版は [android](android/) にあります。Kotlin + Jetpack Composeで実装しています。
 Android Studioで開き、実行・ビルドする方法は [Android版のREADME](android/README.md) を参照してください。
 
-[公開済みのAndroid版APK（1.4.1）をダウンロード](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.4.1/StudyCoPi-Android-1.4.1.apk) · [Releaseと変更内容](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.4.1)
+[Android版APK（1.5.0）をダウンロード](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.5.0/StudyCoPi-Android-1.5.0.apk) · [Releaseと変更内容](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.5.0)
 
 ## v1.5.0
 
