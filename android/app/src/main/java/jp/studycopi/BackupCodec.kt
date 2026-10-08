@@ -5,7 +5,7 @@ import org.json.JSONObject
 import java.time.LocalDate
 import java.time.LocalTime
 
-/** Uses the Web version's v3 schema (durations are hours); older unassigned records stay unassigned. */
+/** Shared Web schema: v3 records and v4 checklists. Durations remain hours. */
 object BackupCodec {
     private fun <T> JSONArray.mapObjects(block: (JSONObject) -> T): List<T> = (0 until length()).map { block(getJSONObject(it)) }
     private fun array(items: List<JSONObject>) = JSONArray(items)
@@ -13,14 +13,15 @@ object BackupCodec {
         pairs.forEach { (key, value) -> if (value != null) put(key, value) }
     }
     fun encode(data: StudyData, internal: Boolean = false): String {
-        val root = obj("version" to 3,
+        val root = obj("version" to if (data.exams.any { it.checklist.isNotEmpty() }) 4 else 3,
             "subjects" to array(data.subjects.map { obj("id" to it.id, "name" to it.name, "color" to it.color) }),
             "examGroups" to array(data.examGroups.map { obj("id" to it.id, "name" to it.name, "type" to it.type, "startDate" to it.startDate, "endDate" to it.endDate) }),
             "schedules" to array(data.schedules.map { obj("id" to it.id, "subjectId" to it.subjectId,
                 "datetime" to it.datetime, "duration" to it.duration, "content" to it.content,
                 "note" to it.note, "status" to it.status, "actualDuration" to it.actualDuration, "examGroupId" to it.examGroupId) }),
             "exams" to array(data.exams.map { obj("id" to it.id, "subject" to it.subject, "date" to it.date,
-                "startTime" to it.startTime, "endTime" to it.endTime, "note" to it.range, "examGroupId" to it.examGroupId) }))
+                "startTime" to it.startTime, "endTime" to it.endTime, "note" to it.range, "examGroupId" to it.examGroupId,
+                "checklist" to if (it.checklist.isEmpty()) null else array(it.checklist.map { item -> obj("id" to item.id, "title" to item.title, "status" to item.status) })) }))
         if (internal) {
             root.put("preferences", obj("timerNotification" to data.preferences.timerNotification,
                 "reminders" to data.preferences.reminders, "reminderMinutes" to data.preferences.reminderMinutes,
@@ -36,7 +37,7 @@ object BackupCodec {
     fun decode(text: String, internal: Boolean = false): StudyData {
         require(text.toByteArray().size <= 10 * 1024 * 1024) { "バックアップは10MB以内にしてください" }
         val root = JSONObject(text)
-        require(!root.has("version") || root.getInt("version") in 1..3) { "未対応のバックアップ形式です" }
+        require(!root.has("version") || root.getInt("version") in 1..4) { "未対応のバックアップ形式です" }
         val subjects = root.getJSONArray("subjects").mapObjects { Subject(it.getString("id"), it.getString("name"), it.getString("color")) }
         val groups = (root.optJSONArray("examGroups") ?: JSONArray()).mapObjects {
             ExamGroup(it.getString("id"), it.getString("name"), it.getString("type"), it.getString("startDate"), it.getString("endDate")) }
@@ -46,7 +47,10 @@ object BackupCodec {
                 if (!it.has("actualDuration") || it.opt("actualDuration") == "") null else it.getDouble("actualDuration"), it.optString("examGroupId")) }
         val exams = root.getJSONArray("exams").mapObjects {
             ExamSession(it.getString("id"), it.getString("subject"), it.getString("date"), it.optString("startTime"),
-                it.optString("endTime"), it.optString("note", it.optString("range")), it.optString("examGroupId")) }
+                it.optString("endTime"), it.optString("note", it.optString("range")), it.optString("examGroupId"),
+                if (it.has("checklist")) it.getJSONArray("checklist").mapObjects { item ->
+                    require(listOf("id", "title", "status").all { key -> item.get(key) is String }) { "試験範囲チェックリストが不正です" }
+                    ChecklistItem(item.getString("id"), item.getString("title"), item.getString("status")) } else emptyList()) }
         val (wakeAlarms, wakeRuns) = WakeBackup.read(root, internal)
         val data = StudyData(subjects, schedules, groups, exams, wakeAlarms = wakeAlarms, wakeRuns = wakeRuns)
         validate(data)
@@ -73,5 +77,7 @@ object BackupCodec {
             (s.actualDuration == null || s.actualDuration.isFinite() && s.actualDuration >= 0) &&
             s.status in statuses && linked(s.examGroupId) }) { "学習記録が不正です" }
         require(data.exams.all { e -> LocalDate.parse(e.date); listOf(e.startTime, e.endTime).forEach { if (it.isNotEmpty()) LocalTime.parse(it) }; linked(e.examGroupId) }) { "教科別日程が不正です" }
+        require(data.exams.all { exam -> exam.checklist.size <= 200 && exam.checklist.map { it.id }.toSet().size == exam.checklist.size &&
+            exam.checklist.all { it.id.matches(Regex("[a-zA-Z0-9_-]+")) && it.title.isNotBlank() && it.title.length <= 300 && it.status in checklistStatuses.map { pair -> pair.first } } }) { "試験範囲チェックリストが不正です" }
     }
 }

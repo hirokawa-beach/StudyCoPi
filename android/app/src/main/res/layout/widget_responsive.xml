@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="12dp" android:background="@drawable/widget_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_date" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="14sp" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="10sp" android:autoSizeMaxTextSize="16sp" android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false" android:textStyle="bold" android:textColor="@color/widget_text" />
+        <ImageView android:id="@+id/widget_refresh" android:layout_width="40dp" android:layout_height="40dp" android:padding="8dp" android:src="@android:drawable/ic_popup_sync" android:tint="@color/widget_accent" android:contentDescription="ウィジェットを更新" android:visibility="gone" />
+    </LinearLayout>
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_label" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="12sp" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" android:paddingTop="4dp" android:textColor="@color/widget_secondary" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_hours" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="16sp" android:autoSizeMaxTextSize="40sp" android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false" android:fontFeatureSettings="tnum" android:textStyle="bold" android:gravity="center_vertical" android:textColor="@color/widget_text" />
+        <ImageView android:id="@+id/widget_ring" android:layout_width="64dp" android:layout_height="64dp" android:layout_marginStart="12dp" android:scaleType="fitCenter" android:visibility="gone" />
+    </LinearLayout>
+    <ProgressBar android:id="@+id/widget_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="8dp" android:layout_marginTop="4dp" android:progressTint="@color/widget_chart" android:progressBackgroundTint="@color/widget_track" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_chart_label" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="12sp" android:includeFontPadding="false" android:paddingTop="4dp" android:textColor="@color/widget_secondary" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+    <ImageView android:id="@+id/widget_chart" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:scaleType="fitCenter" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_empty" style="@style/WidgetRow" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_row_1" style="@style/WidgetRow" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_row_2" style="@style/WidgetRow" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_row_3" style="@style/WidgetRow" android:visibility="gone" />
+    <LinearLayout android:id="@+id/widget_spacer" android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="1" android:orientation="vertical" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_more" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="12sp" android:includeFontPadding="false" android:paddingTop="4dp" android:maxLines="1" android:ellipsize="end" android:textColor="@color/widget_accent" android:visibility="gone" />
+</LinearLayout>

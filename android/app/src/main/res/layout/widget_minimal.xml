@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="6dp" android:background="@drawable/widget_background">
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_date" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="12sp" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="10sp" android:autoSizeMaxTextSize="12sp" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" android:textStyle="bold" android:textColor="@color/widget_text" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_label" android:layout_width="match_parent" android:layout_height="16dp" android:textSize="10sp" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="10sp" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" android:textColor="@color/widget_secondary" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_hours" android:layout_width="match_parent" android:layout_height="wrap_content" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="14sp" android:autoSizeMaxTextSize="24sp" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" android:fontFeatureSettings="tnum" android:textStyle="bold" android:textColor="@color/widget_text" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_refresh" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <ImageView android:id="@+id/widget_ring" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_chart_label" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <ImageView android:id="@+id/widget_chart" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_empty" style="@style/WidgetRow" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_row_1" style="@style/WidgetRow" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_row_2" style="@style/WidgetRow" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_row_3" style="@style/WidgetRow" android:visibility="gone" />
+    <TextView android:fontFamily="@font/widget_sans" android:id="@+id/widget_more" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+</LinearLayout>

@@ -123,7 +123,7 @@ class ComposeFlowTest {
         ready()
         compose.onNodeWithText("その他", useUnmergedTree = true).performClick()
         compose.onNodeWithText("StudyCoPiについて").performScrollTo().performClick()
-        compose.onNodeWithText("バージョン 1.5.0 · Android版").assertIsDisplayed()
+        compose.onNodeWithText("バージョン 1.5.1 · Android版").assertIsDisplayed()
         compose.onNodeWithText("ひろかわびーち（hirokawa-beach）").assertExists()
         capture("about-native.png")
         compose.onNodeWithContentDescription("戻る").performClick()

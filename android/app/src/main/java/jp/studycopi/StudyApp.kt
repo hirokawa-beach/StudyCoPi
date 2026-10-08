@@ -138,10 +138,10 @@ import kotlin.math.roundToInt
                     { screen = "timer" }, { id -> examFilter = id; screen = "stats" }, { open("group") })
                 displayScreen == "plans" -> key(if (guideVisible) "tour-$guideStep" else "plans") {
                     PlansScreen(displayData, model, if (guideVisible) "" else examFilter, { examFilter = it },
-                        { open("schedule", it) }, { open("record", it) }, { screen = "timer" }, { open("exam", it) })
+                        { open("schedule", it) }, { open("record", it) }, { screen = "timer" }, { open("exam", it) }, { open("checklist", it) })
                 }
                 displayScreen == "exams" -> ExamsScreen(data, { open("group", it) }, { open("exam", it) },
-                    { examFilter = it; screen = "stats" }, { examFilter = it; screen = "plans" }, { open("newExam", it) })
+                    { examFilter = it; screen = "stats" }, { examFilter = it; screen = "plans" }, { open("newExam", it) }, { open("checklist", it) })
                 displayScreen == "stats" -> StatsScreen(data, examFilter, { examFilter = it })
                 displayScreen == "timer" -> TimerScreen(data, point, model, { requestNotifications() })
                 displayScreen == "subjects" -> SubjectsScreen(data, model, { open("subject", it) })
@@ -170,6 +170,7 @@ import kotlin.math.roundToInt
                     "group" -> GroupForm(data, data.examGroups.find { it.id == sheetId }, model, close)
                     "exam" -> ExamForm(data, data.exams.find { it.id == sheetId }, "", model, close)
                     "newExam" -> ExamForm(data, null, sheetId, model, close)
+                    "checklist" -> data.exams.find { it.id == sheetId }?.let { ChecklistSheet(it, data.groupName(it.examGroupId), model, close) }
                     "subject" -> SubjectForm(data.subjects.find { it.id == sheetId }, model, close)
                     "wake" -> WakeAlarmForm(data.wakeAlarms.find { it.id == sheetId }, data, model, close)
                 }
@@ -304,7 +305,7 @@ import kotlin.math.roundToInt
 }
 
 @Composable private fun PlansScreen(data: StudyData, model: StudyViewModel, examFilter: String, filter: (String) -> Unit,
-    edit: (String) -> Unit, record: (String) -> Unit, timer: () -> Unit, editExam: (String) -> Unit) {
+    edit: (String) -> Unit, record: (String) -> Unit, timer: () -> Unit, editExam: (String) -> Unit, checklist: (String) -> Unit) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     var subject by rememberSaveable { mutableStateOf("") }
     var status by rememberSaveable { mutableStateOf("") }
@@ -373,7 +374,7 @@ import kotlin.math.roundToInt
             item(key = "date-$date") { Text(date.format(DateTimeFormatter.ofPattern("M月d日（E）", java.util.Locale.JAPANESE)), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)) }
             val dayItems = items.filter { it.date == date }.sortedBy { it.datetime }
             items(dayItems, key = { "plan-${it.id}" }) { StudyRow(it, data, model, edit, record, timer) }
-            items(exams.filter { it.date == date.toString() }.sortedBy { it.startTime }, key = { "exam-${it.id}" }) { ExamRow(it, editExam) }
+            items(exams.filter { it.date == date.toString() }.sortedBy { it.startTime }, key = { "exam-${it.id}" }) { ExamRow(it, editExam, checklist) }
             if (dayItems.isEmpty() && exams.none { it.date == date.toString() }) item { EmptyMessage("予定はありません", "予定を追加") { edit("") } }
         }
         activeDates.forEach { day(it) }
@@ -385,7 +386,7 @@ import kotlin.math.roundToInt
 }
 
 @Composable private fun ExamsScreen(data: StudyData, edit: (String) -> Unit, editExam: (String) -> Unit,
-    stats: (String) -> Unit, plans: (String) -> Unit, addExam: (String) -> Unit) {
+    stats: (String) -> Unit, plans: (String) -> Unit, addExam: (String) -> Unit, checklist: (String) -> Unit) {
     var year by rememberSaveable { mutableStateOf("") }
     var expanded by rememberSaveable { mutableStateOf("") }
     val today = LocalDate.now().toString()
@@ -425,7 +426,7 @@ import kotlin.math.roundToInt
                         Text("教科別の日程 ${sessions.size}件"); Icon(if (expanded == group.id) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null)
                     }
                     if (expanded == group.id) {
-                        sessions.forEach { ExamRow(it, editExam) }
+                        sessions.forEach { ExamRow(it, editExam, checklist) }
                         OutlinedButton(onClick = { addExam(group.id) }) { Text("教科の日程を追加") }
                     }
                 }
@@ -435,13 +436,13 @@ import kotlin.math.roundToInt
             Text("試験未指定の記録", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
             Text("日常の学習や以前の記録も、ここから確認できます。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextButton(onClick = { plans("unassigned") }) { Text("未指定の学習を見る"); Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null) }
-            data.exams.filter { it.examGroupId.isEmpty() }.forEach { ExamRow(it, editExam) }
+            data.exams.filter { it.examGroupId.isEmpty() }.forEach { ExamRow(it, editExam, checklist) }
             TextButton(onClick = { addExam("") }) { Text("未指定の教科日程を追加") }
         }
     }
 }
 
-@Composable private fun ExamRow(exam: ExamSession, edit: (String) -> Unit) {
+@Composable private fun ExamRow(exam: ExamSession, edit: (String) -> Unit, checklist: (String) -> Unit) {
     Card(onClick = { edit(exam.id) }, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -452,6 +453,9 @@ import kotlin.math.roundToInt
                 if (exam.range.isNotEmpty()) Text(exam.range, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "${exam.subject}の日程を編集")
+        }
+        TextButton(onClick = { checklist(exam.id) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Text("範囲チェックリスト · ${exam.checklist.count { it.status == "done" }} / ${exam.checklist.size}件 完了")
         }
     }
 }

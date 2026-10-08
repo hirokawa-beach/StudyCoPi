@@ -108,7 +108,39 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
         val group = data.value.examGroups.find { it.id == exam.examGroupId }
         require(group == null || exam.date in group.startDate..group.endDate) { "試験期間内の日付を選んでください" }
         require(exam.startTime.isEmpty() || exam.endTime.isEmpty() || exam.endTime > exam.startTime) { "終了時刻は開始時刻より後にしてください" }
-        change { it.copy(exams = it.exams.filterNot { e -> e.id == exam.id } + exam) }
+        change { it.copy(exams = it.exams.filterNot { e -> e.id == exam.id } + exam.copy(checklist = it.exams.find { e -> e.id == exam.id }?.checklist ?: exam.checklist)) }
+    }
+    fun addChecklistItems(examId: String, text: String, completed: (Boolean) -> Unit = {}) = run {
+        try {
+        val titles = text.lines().map(String::trim).filter(String::isNotEmpty)
+        require(titles.isNotEmpty() && titles.all { it.length <= 300 }) { "範囲を1行ずつ入力してください（1行300文字まで）" }
+        val additions = titles.map { ChecklistItem(title = it) }
+        change { data ->
+            val exam = data.exams.find { it.id == examId } ?: error("教科の日程が削除されています")
+            require(exam.checklist.size + additions.size <= 200) { "チェックリストは200件までです" }
+            data.copy(exams = data.exams.map { if (it.id == examId) it.copy(checklist = it.checklist + additions) else it })
+        }
+        completed(true)
+        } catch (error: Exception) { completed(false); throw error }
+    }
+    fun updateChecklistItem(examId: String, itemId: String, title: String? = null, status: String? = null) = run {
+        require(title == null || title.isNotBlank() && title.trim().length <= 300) { "範囲の名前を確認してください" }
+        require(status == null || status in checklistStatuses.map { it.first }) { "状況を確認してください" }
+        change { data -> data.copy(exams = data.exams.map { exam -> if (exam.id != examId) exam else {
+            check(exam.checklist.any { it.id == itemId }) { "項目が削除されています" }
+            exam.copy(checklist = exam.checklist.map { if (it.id == itemId) it.copy(title = title?.trim() ?: it.title, status = status ?: it.status) else it })
+        } }) }
+    }
+    fun deleteChecklistItem(examId: String, itemId: String) = run {
+        val previous = data.value.exams.find { it.id == examId }?.checklist?.find { it.id == itemId } ?: return@run
+        change { data -> data.copy(exams = data.exams.map { if (it.id == examId) it.copy(checklist = it.checklist.filterNot { item -> item.id == itemId }) else it }) }
+        eventChannel.send(Notice("範囲を削除しました") {
+            change { data ->
+                val exam = data.exams.find { it.id == examId } ?: error("教科の日程が削除されています")
+                require(exam.checklist.size < 200 && exam.checklist.none { it.id == itemId }) { "取り消せません" }
+                data.copy(exams = data.exams.map { if (it.id == examId) it.copy(checklist = it.checklist + previous) else it })
+            }
+        })
     }
     fun deleteExam(id: String) = run { change { it.copy(exams = it.exams.filterNot { e -> e.id == id }) } }
     fun saveSubject(subject: Subject) = run {

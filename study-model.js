@@ -76,6 +76,7 @@
     return {from, to, start, end};
   }
   function validateBackup(data) {
+    if (data?.version !== undefined && (!Number.isInteger(data.version) || data.version < 1 || data.version > 4)) throw new Error("未対応のバックアップ形式です");
     if (!data || ![data.subjects, data.schedules, data.exams].every(Array.isArray)
       || (data.examGroups !== undefined && !Array.isArray(data.examGroups))) throw new Error("バックアップの形式が正しくありません");
     const groups = data.examGroups || [];
@@ -96,9 +97,16 @@
       || !validLink(s) || (s.status && !["pending", "done", "partial", "miss"].includes(s.status)))) throw new Error("学習記録が不正です");
     if (data.exams.some((e) => !validDate(e.date) || typeof e.subject !== "string" || !validLink(e)
       || [e.startTime, e.endTime].some((t) => t && !/^([01]\d|2[0-3]):[0-5]\d$/.test(t)))) throw new Error("教科別日程が不正です");
+    for (const exam of data.exams) {
+      if (exam.checklist === undefined) continue;
+      if (!Array.isArray(exam.checklist) || exam.checklist.length > 200 || new Set(exam.checklist.map(item => item?.id)).size !== exam.checklist.length ||
+        exam.checklist.some(item => !item || !validId(item.id) || typeof item.title !== 'string' || !item.title.trim() || item.title.length > 300 || !checklistStatuses.some(status => status[0] === item.status))) throw new Error("試験範囲チェックリストが不正です");
+    }
     return { subjects: data.subjects, schedules: data.schedules, exams: data.exams, examGroups: groups };
   }
-  const api = { actualHours, totals, forExam, localDate, weekStart, dailyTotals, timeBuckets, heatLevel, activityRange, validateBackup };
+  const checklistStatuses = [['pending','未着手'],['progress','途中'],['review','要復習'],['done','完了']];
+  const checklistTotals = (items = []) => ({ count: items.length, done: items.filter(item => item.status === 'done').length, review: items.filter(item => item.status === 'review').length });
+  const api = { actualHours, totals, forExam, localDate, weekStart, dailyTotals, timeBuckets, heatLevel, activityRange, checklistStatuses, checklistTotals, validateBackup };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.StudyModel = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

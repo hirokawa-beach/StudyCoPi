@@ -30,8 +30,11 @@ data class Schedule(val id: String = newId(), val subjectId: String, val datetim
     fun complete(): Schedule = if (status == "done") copy(status = "pending")
         else copy(status = "done", actualDuration = actualDuration ?: duration)
 }
+val checklistStatuses = listOf("pending" to "未着手", "progress" to "途中", "review" to "要復習", "done" to "完了")
+data class ChecklistItem(val id: String = newId(), val title: String, val status: String = "pending")
 data class ExamSession(val id: String = newId(), val subject: String, val date: String,
-    val startTime: String = "", val endTime: String = "", val range: String = "", val examGroupId: String = "")
+    val startTime: String = "", val endTime: String = "", val range: String = "", val examGroupId: String = "",
+    val checklist: List<ChecklistItem> = emptyList())
 data class Preferences(val timerNotification: Boolean = true, val reminders: Boolean = false,
     val reminderMinutes: Int = 15, val examReminder: Boolean = false, val scheduledFocus: Boolean = false)
 data class ClockPoint(val wall: Long, val monotonic: Long, val boot: Int)
@@ -66,11 +69,10 @@ data class StudyData(val subjects: List<Subject> = listOf(
                 val actual = it.actual + hours
                 it.copy(actualDuration = actual, status = if (actual + 0.00001 >= it.duration) "done" else "partial")
             }
-        } else if (hours > 0) schedules + Schedule(subjectId = current.subjectId,
+        } else schedules + Schedule(subjectId = current.subjectId,
             examGroupId = current.examGroupId, datetime = current.originalStart,
             duration = current.targetMs / 3_600_000.0, actualDuration = hours,
-            content = "集中タイマー", status = if (current.elapsed(now) >= current.targetMs) "done" else "partial")
-        else schedules
+            content = "集中タイマー", status = "done")
         return copy(schedules = updated, timer = null)
     }
     fun withoutGroup(id: String): StudyData = copy(examGroups = examGroups.filterNot { it.id == id },

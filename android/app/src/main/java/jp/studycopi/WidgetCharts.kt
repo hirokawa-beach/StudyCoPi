@@ -28,9 +28,11 @@ fun widgetVisual(data: StudyData, kind: WidgetKind, today: LocalDate): WidgetVis
 /** Data-derived graphics for RemoteViews, small enough for the widget binder budget. */
 object WidgetCharts {
     private fun color(context: Context, id: Int) = context.getColor(id)
-    fun ring(context: Context, visual: WidgetVisual): Bitmap {
-        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
+    fun ring(context: Context, visual: WidgetVisual, sizeDp: Int = 64): Bitmap {
+        val pixels = (sizeDp * context.resources.displayMetrics.density).roundToInt().coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(pixels, pixels, Bitmap.Config.ARGB_8888).apply { density = context.resources.displayMetrics.densityDpi }
         val canvas = Canvas(bitmap)
+        canvas.scale(pixels / 120f, pixels / 120f)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 11f; style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
         val bounds = RectF(12f, 12f, 108f, 108f)
         paint.color = color(context, R.color.widget_track); canvas.drawArc(bounds, 0f, 360f, false, paint)
@@ -44,11 +46,15 @@ object WidgetCharts {
         return bitmap
     }
     fun bars(context: Context, visual: WidgetVisual, width: Int, height: Int): Bitmap {
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val density = context.resources.displayMetrics.density
+        val pixelWidth = (width * density).roundToInt().coerceAtLeast(1)
+        val pixelHeight = (height * density).roundToInt().coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(pixelWidth, pixelHeight, Bitmap.Config.ARGB_8888).apply { this.density = context.resources.displayMetrics.densityDpi }
         val canvas = Canvas(bitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        canvas.scale(pixelWidth / width.toFloat(), pixelHeight / height.toFloat())
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply { textLocale = Locale.JAPANESE }
         val maximum = visual.days.maxOfOrNull { it.second }?.coerceAtLeast(1.0) ?: 1.0
-        val baseline = height - 17f
+        val baseline = height - 22f
         val barHeight = baseline - 4f
         val columnWidth = width / 7f
         val barWidth = columnWidth * .55f
@@ -59,8 +65,8 @@ object WidgetCharts {
             paint.color = color(context, if (index == 6) R.color.widget_chart else R.color.widget_chart_past)
             val filled = (hours / maximum * barHeight).toFloat()
             if (filled > 0) canvas.drawRoundRect(x, baseline - filled, x + barWidth, baseline, 3f, 3f, paint)
-            paint.textSize = 11f; paint.textAlign = Paint.Align.CENTER
-            paint.typeface = android.graphics.Typeface.create("sans-serif", if (index == 6) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+            paint.textSize = 12f; paint.textAlign = Paint.Align.CENTER
+            paint.typeface = android.graphics.Typeface.create(context.resources.getFont(R.font.widget_sans), if (index == 6) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
             paint.color = color(context, if (index == 6) R.color.widget_chart else R.color.widget_secondary)
             canvas.drawText(date.format(DateTimeFormatter.ofPattern("E", Locale.JAPANESE)), x + barWidth / 2, height - 5f, paint)
         }

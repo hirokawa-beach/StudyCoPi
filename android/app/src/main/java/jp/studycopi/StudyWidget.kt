@@ -30,18 +30,19 @@ fun widgetContent(data: StudyData, today: LocalDate = LocalDate.now()): WidgetCo
 }
 open class StudyWidget : AppWidgetProvider() {
     open val kind = WidgetKind.TODAY
-    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: android.os.Bundle) { refresh(context) }
+    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: android.os.Bundle) { refresh(context, id, android.os.Bundle(options)) }
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) { refresh(context) }
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action in setOf(REFRESH, Intent.ACTION_DATE_CHANGED, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED)) refresh(context)
     }
-    private fun refresh(context: Context) {
+    private fun refresh(context: Context, id: Int? = null, options: android.os.Bundle? = null) {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val data = (context.applicationContext as StudyApplication).repository.load()
-                updateAll(context, data)
+                if (id == null) updateAll(context, data)
+                else AppWidgetManager.getInstance(context).updateAppWidget(id, adaptiveViews(context, kind, data, options ?: android.os.Bundle()))
             } catch (error: Exception) {
                 android.util.Log.e("StudyCoPi", "Could not read widget data", error)
                 val manager = AppWidgetManager.getInstance(context)
@@ -85,70 +86,115 @@ open class StudyWidget : AppWidgetProvider() {
             WidgetKind.HOURS to TodayHoursWidget::class.java, WidgetKind.TOTAL to TotalHoursWidget::class.java,
             WidgetKind.ALARM to NextAlarmWidget::class.java, WidgetKind.NEXT to NextPlanWidget::class.java)
         fun presentationViews(context: Context, kind: WidgetKind, content: WidgetPresentation, height: Int, width: Int = 170): RemoteViews {
-            val compact = height < 280
-            val ring = content.visual != null && kind != WidgetKind.HOURS && height >= 130 && width >= 220
-            val bars = content.visual != null && height >= 130 && kind in listOf(WidgetKind.HOURS, WidgetKind.TOTAL) && !(kind == WidgetKind.TOTAL && ring && compact && height < 170)
-            val rows = if (height < 130 || compact && kind in listOf(WidgetKind.ALARM, WidgetKind.NEXT) && width < 220 || bars && kind != WidgetKind.TOTAL) emptyList()
-                else content.rows.take(if (compact && kind == WidgetKind.PLANS) 2 else if (compact) 1 else if (kind == WidgetKind.TODAY && ring) if (height < 320) 1 else 2 else if (height < 320) 2 else 3)
-            val layout = if (compact && height >= 130 && kind in listOf(WidgetKind.ALARM, WidgetKind.NEXT)) R.layout.widget_clock else if (compact) R.layout.widget_compact else R.layout.study_widget
+            val scale = context.resources.configuration.fontScale.coerceAtLeast(1f)
+            val micro = height < 100
+            val microWide = micro && width >= 280
+            val padding = if (microWide) 8 else if (micro) 4 else if (height < 200) 12 else 16
+            fun textHeight(sp: Int): Int {
+                val paint = android.text.TextPaint().apply {
+                    typeface = context.resources.getFont(R.font.widget_sans)
+                    textSize = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, sp.toFloat(), context.resources.displayMetrics)
+                }
+                return kotlin.math.ceil((paint.fontMetrics.descent - paint.fontMetrics.ascent) / context.resources.displayMetrics.density).toInt()
+            }
+            val titleHeight = maxOf(if (micro) 18 else 20, textHeight(if (micro) 12 else 14))
+            val valueHeight = if (microWide) (height - padding * 2).coerceIn(48, 64) else if (micro) if (scale > 1.1f) (height - padding * 2 - titleHeight).coerceIn(28, 40) else 28 else if (height / scale < 170) 36 else 56
+            val visual = content.visual
+            val ring = !micro && visual != null && kind != WidgetKind.HOURS && width >= 220 && height / scale >= 180
+            val bars = !micro && visual != null && (kind == WidgetKind.HOURS && height / scale >= 125 || kind == WidgetKind.TOTAL && height / scale >= 220)
+            val footer = !micro && height / scale >= 220
+            val progress = !micro && visual != null && kind != WidgetKind.HOURS && !ring && !bars
+            val label = when (kind) {
+                WidgetKind.TODAY -> "予定 ${hoursText(visual?.planned ?: 0.0)} · 未完了${content.entries.size}件"
+                WidgetKind.HOURS -> if (micro) "7日計 ${hoursText(visual?.days?.sumOf { it.second } ?: 0.0)}" else ""
+                WidgetKind.TOTAL -> "予定 ${hoursText(visual?.planned ?: 0.0)}" + (visual?.ratio?.let { " · ${(it * 100).toInt()}%" } ?: "")
+                else -> content.label
+            }
+            val labelVisible = label.isNotEmpty() && !(micro && !microWide && scale > 1.1f)
+            val labelHeight = if (labelVisible) if (micro) 16 else textHeight(12) + 4 else 0
+            val footerHeight = if (footer) textHeight(12) + 4 else 0
+            val bodyHeight = (height - padding * 2 - maxOf(titleHeight, if (footer) 40 else 0) - labelHeight - maxOf(valueHeight, if (ring) 64 else 0) - footerHeight - if (progress) 12 else 0).coerceAtLeast(0)
+            val rowSp = if (height / scale >= 200) 16 else 14
+            val lineHeight = kotlin.math.ceil(textHeight(rowSp) * 1.2).toInt() + 8
+            val lead = content.entries.firstOrNull()
+            var value = content.value
+            val displayed = mutableListOf<String>()
+            if (kind == WidgetKind.PLANS && lead != null) {
+                value = if (micro && !microWide) "${lead.time} ${lead.subject}" else lead.time
+                if (!micro && bodyHeight >= lineHeight) {
+                    displayed += if (bodyHeight >= lineHeight * 2) lead.subject else "${lead.subject} · ${lead.detail}"
+                    if (bodyHeight >= lineHeight * 2 && lead.detail.isNotBlank()) displayed += lead.detail
+                    if (bodyHeight >= lineHeight * 4 && content.entries.size > 1) {
+                        val next = content.entries[1]; displayed += "${next.time}  ${next.subject}\n${next.detail}"
+                    }
+                }
+            } else if (!micro && !bars) {
+                val candidates = if (kind == WidgetKind.TODAY) content.entries.map { "${it.time}  ${it.subject}\n${it.detail}" } else content.rows
+                if (kind != WidgetKind.TOTAL) displayed += candidates.take((bodyHeight / (lineHeight * if (height / scale >= 180) 2 else 1)).coerceIn(0, 3))
+            }
+            val title = when {
+                kind == WidgetKind.PLANS && width >= 160 -> "今日の予定 · ${content.value}"
+                kind == WidgetKind.HOURS && width < 150 -> "今日の勉強"
+                kind == WidgetKind.TOTAL && width < 150 -> "累積の勉強"
+                else -> kind.title.let { if (kind == WidgetKind.TOTAL) "累積勉強時間" else it }
+            }
+            val layout = if (microWide) R.layout.widget_minimal_wide else if (micro) R.layout.widget_minimal else R.layout.widget_responsive
             return RemoteViews(context.packageName, layout).apply {
-                if (compact && height in 130..169) setViewPadding(R.id.widget_root, dp(context, 12), dp(context, 8), dp(context, 12), dp(context, 8))
-                setTextViewText(R.id.widget_date, japanese(content.title))
-                setTextViewText(R.id.widget_label, japanese(content.label))
-                setTextViewText(R.id.widget_hours, japanese(content.value))
+                val horizontalPadding = if (micro) 12 else padding
+                setViewPadding(R.id.widget_root, dp(context, horizontalPadding), dp(context, padding), dp(context, horizontalPadding), dp(context, padding))
+                setTextViewText(R.id.widget_date, japanese(title))
+                setInt(R.id.widget_date, "setHeight", dp(context, titleHeight))
+                val microLabel = when {
+                    microWide && kind == WidgetKind.PLANS && lead != null -> "${lead.subject}\n${lead.detail}"
+                    microWide && kind in listOf(WidgetKind.NEXT, WidgetKind.ALARM) -> label + content.rows.firstOrNull()?.let { "\n$it" }.orEmpty()
+                    micro && kind == WidgetKind.PLANS && lead != null -> lead.detail
+                    else -> label
+                }
+                setTextViewText(R.id.widget_label, japanese(microLabel))
+                if (microWide) {
+                    val labelSp = if (scale > 1.1f) 10 else 12
+                    setTextViewTextSize(R.id.widget_label, android.util.TypedValue.COMPLEX_UNIT_SP, labelSp.toFloat())
+                    setInt(R.id.widget_label, "setMaxLines", if (height - padding * 2 - titleHeight >= textHeight(labelSp) * 2) 2 else 1)
+                }
+                setViewVisibility(R.id.widget_label, if (labelVisible) View.VISIBLE else View.GONE)
+                setTextViewText(R.id.widget_hours, japanese(value))
+                setInt(R.id.widget_hours, "setHeight", dp(context, valueHeight))
+                setContentDescription(R.id.widget_hours, japanese(visual?.description ?: "$title、${content.label}、$value"))
+                setViewVisibility(R.id.widget_refresh, if (footer) View.VISIBLE else View.GONE)
                 setTextViewText(R.id.widget_empty, japanese(content.empty))
-                setViewVisibility(R.id.widget_empty, if (!compact && rows.isEmpty() && content.empty.isNotEmpty()) View.VISIBLE else View.GONE)
+                setTextViewTextSize(R.id.widget_empty, android.util.TypedValue.COMPLEX_UNIT_SP, if (height / scale < 180) 12f else 14f)
+                setInt(R.id.widget_empty, "setMaxLines", if (height / scale < 180) 1 else 2)
+                setViewVisibility(R.id.widget_empty, if (!micro && kind == WidgetKind.PLANS && lead == null && bodyHeight >= textHeight(12) + 8) View.VISIBLE else View.GONE)
                 listOf(R.id.widget_row_1, R.id.widget_row_2, R.id.widget_row_3).forEachIndexed { index, id ->
-                    setTextViewText(id, planRow(context, rows.getOrNull(index).orEmpty()))
-                    if (compact) { setInt(id, "setMaxLines", 1); setTextViewTextSize(id, android.util.TypedValue.COMPLEX_UNIT_SP, 14f) }
-                    setViewVisibility(id, if (index < rows.size) View.VISIBLE else View.GONE)
+                    setTextViewText(id, planRow(context, displayed.getOrNull(index).orEmpty()))
+                    setTextViewTextSize(id, android.util.TypedValue.COMPLEX_UNIT_SP, rowSp.toFloat())
+                    setInt(id, "setMaxLines", if (kind == WidgetKind.PLANS && index < 2 || height / scale < 180) 1 else 2)
+                    setViewVisibility(id, if (index < displayed.size) View.VISIBLE else View.GONE)
                 }
-                // Keep planned and actual totals visible even in the smaller layout.
-                if (kind == WidgetKind.TOTAL && compact) setTextViewText(R.id.widget_label, japanese(content.rows.first().replace("累積予定時間  ", "予定 ")))
-                if (kind == WidgetKind.TOTAL && compact) setViewVisibility(R.id.widget_row_1, View.GONE)
-                setTextViewText(R.id.widget_more, japanese(if (content.rows.size > rows.size && kind in listOf(WidgetKind.TODAY, WidgetKind.PLANS)) "ほかの予定はタップして確認 ›" else content.more))
-                setViewVisibility(R.id.widget_more, if (height < 320) View.GONE else View.VISIBLE)
-                if (bars && !compact && height < 320) setViewVisibility(R.id.widget_more, View.GONE)
-                if (compact && kind == WidgetKind.PLANS) {
-                    setViewVisibility(R.id.widget_hours, View.GONE)
-                    setTextViewText(R.id.widget_date, japanese("今日の予定 · ${content.value}"))
+                if (kind == WidgetKind.TOTAL) setTextViewText(R.id.widget_row_1, japanese(content.rows.firstOrNull().orEmpty()))
+                if (ring && visual != null) {
+                    setImageViewBitmap(R.id.widget_ring, WidgetCharts.ring(context, visual, 64))
+                    setContentDescription(R.id.widget_ring, japanese(visual.description))
+                    setViewVisibility(R.id.widget_ring, View.VISIBLE)
                 }
-                if (compact && kind == WidgetKind.TODAY) setTextViewText(R.id.widget_label, japanese("今日の勉強時間"))
-                if (height < 220) setViewVisibility(R.id.widget_refresh, View.GONE)
-                content.visual?.let { visual ->
-                    setContentDescription(R.id.widget_hours, japanese(visual.description))
-                    if (ring) {
-                        setViewVisibility(R.id.widget_ring, View.VISIBLE)
-                        setImageViewBitmap(R.id.widget_ring, WidgetCharts.ring(context, visual))
-                        setContentDescription(R.id.widget_ring, japanese(visual.description))
-                    }
-                    if (bars) {
-                        setViewVisibility(R.id.widget_chart, View.VISIBLE)
-                        val chartHeight = if (!compact) 56 else 40
-                        setImageViewBitmap(R.id.widget_chart, WidgetCharts.bars(context, visual, (width - if (compact) 24 else 32).coerceAtLeast(84), chartHeight))
-                        setContentDescription(R.id.widget_chart, japanese("直近7日の勉強時間。" + visual.days.joinToString("、") { "${it.first.monthValue}/${it.first.dayOfMonth} ${hoursText(it.second)}" }))
-                        if (!compact || height >= 170) {
-                            setViewVisibility(R.id.widget_chart_label, View.VISIBLE)
-                            setTextViewText(R.id.widget_chart_label, japanese("直近7日 · 最大 ${hoursText(visual.days.maxOf { it.second })}"))
-                        }
-                        if (compact && kind == WidgetKind.HOURS) setViewVisibility(R.id.widget_label, View.GONE)
-                        if (compact && kind == WidgetKind.TOTAL) setViewPadding(R.id.widget_label, 0, 0, 0, 0)
-                    }
-                    if (kind == WidgetKind.TODAY && ring) setTextViewText(R.id.widget_label, japanese("勉強時間 · 予定 ${hoursText(visual.planned)}"))
-                    if (!compact && kind == WidgetKind.TOTAL) {
-                        setTextViewText(R.id.widget_label, japanese("予定 ${hoursText(visual.planned)} · 全期間"))
-                        setViewVisibility(R.id.widget_row_1, View.GONE)
-                    }
+                if (progress && visual != null) {
+                    setProgressBar(R.id.widget_progress, 100, ((visual.ratio ?: 0.0) * 100).toInt().coerceIn(0, 100), false)
+                    setViewVisibility(R.id.widget_progress, View.VISIBLE)
+                    setContentDescription(R.id.widget_progress, japanese(visual.description))
                 }
-                if (height < 130) {
-                    setViewPadding(R.id.widget_root, dp(context, 8), dp(context, 8), dp(context, 8), dp(context, 8))
-                    setViewVisibility(R.id.widget_refresh, View.GONE)
-                    setInt(R.id.widget_date, "setMaxLines", 1)
-                    setViewVisibility(R.id.widget_label, View.GONE)
-                    setTextViewTextSize(R.id.widget_date, android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
-                    setTextViewTextSize(R.id.widget_hours, android.util.TypedValue.COMPLEX_UNIT_SP, 20f)
-                    if (kind == WidgetKind.NEXT) setTextViewText(R.id.widget_date, japanese(content.label))
+                if (bars && visual != null) {
+                    val captionHeight = textHeight(12) + 4
+                    val graphHeight = (bodyHeight - captionHeight).coerceIn(32, 200)
+                    setViewVisibility(R.id.widget_chart_label, View.VISIBLE)
+                    setTextViewText(R.id.widget_chart_label, japanese(if (height < 180) "直近7日" else "直近7日 · 最大 ${hoursText(visual.days.maxOf { it.second })}"))
+                    setImageViewBitmap(R.id.widget_chart, WidgetCharts.bars(context, visual, (width - padding * 2).coerceAtLeast(60), graphHeight))
+                    setContentDescription(R.id.widget_chart, japanese("直近7日の勉強時間。" + visual.days.joinToString("、") { "${it.first.monthValue}/${it.first.dayOfMonth} ${hoursText(it.second)}" }))
+                    setViewVisibility(R.id.widget_chart, View.VISIBLE)
+                    setViewVisibility(R.id.widget_spacer, View.GONE)
                 }
+                val more = if (kind == WidgetKind.PLANS && lead != null) "未完了${content.entries.size}件 · 予定を開く ›" else content.more
+                setTextViewText(R.id.widget_more, japanese(more))
+                setViewVisibility(R.id.widget_more, if (footer) View.VISIBLE else View.GONE)
                 val open = PendingIntent.getActivity(context, 710 + kind.ordinal, Intent(context, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("openScreen", kind.route),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -160,15 +206,10 @@ open class StudyWidget : AppWidgetProvider() {
         private fun dp(context: Context, value: Int): Int = (value * context.resources.displayMetrics.density).toInt()
         fun adaptiveViews(context: Context, kind: WidgetKind, data: StudyData, options: android.os.Bundle): RemoteViews {
             val content = widgetPresentation(data, kind)
-            if (android.os.Build.VERSION.SDK_INT >= 31) return RemoteViews(mapOf(
-                android.util.SizeF(110f, 70f) to presentationViews(context, kind, content, 70, 110),
-                android.util.SizeF(110f, 140f) to presentationViews(context, kind, content, 140, 110),
-                android.util.SizeF(170f, 140f) to presentationViews(context, kind, content, 140, 170),
-                android.util.SizeF(240f, 140f) to presentationViews(context, kind, content, 140, 240),
-                android.util.SizeF(350f, 140f) to presentationViews(context, kind, content, 140, 350),
-                android.util.SizeF(240f, 280f) to presentationViews(context, kind, content, 280, 240),
-                android.util.SizeF(350f, 320f) to presentationViews(context, kind, content, 320, 350)))
-            return presentationViews(context, kind, content, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, if (kind == WidgetKind.TODAY) 320 else 170), options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 240))
+            val sizes = widgetSizes(options, kind)
+            fun render(size: android.util.SizeF) = presentationViews(context, kind, content, size.height.toInt(), size.width.toInt())
+            if (android.os.Build.VERSION.SDK_INT >= 31) return RemoteViews(sizes.associateWith(::render))
+            return if (sizes.size == 1) render(sizes.first()) else RemoteViews(render(sizes.last()), render(sizes.first()))
         }
         fun updateAll(context: Context, data: StudyData) {
             val manager = AppWidgetManager.getInstance(context)

@@ -3,6 +3,14 @@
 Kotlin + Jetpack Composeで作ったAndroid版です。WebView・Capacitorは使いません。
 Android 8.0（API 26）以降に対応します。Web版はリポジトリ直下に残しています。
 
+## v1.5.1
+
+- 新しいアイコンに統一しました。
+- 試験・教科ごとの範囲チェックを追加。未着手・途中・要復習・完了の4状態を管理でき、上部の進捗を固定して一覧だけをスクロールできます。
+- ホーム画面ウィジェットを実際の配置サイズに合わせて表示。小さくても情報の意味が分かり、グラフは端末の画面密度に合わせて描画します。
+- 予定を作らずに開始したタイマーは、終了時に必ず「完了」で記録します。
+- 範囲チェックを含むJSONバックアップはv4形式です。Web・Androidとも1.5.1以降で復元してください。
+
 ## v1.5.0
 
 - 日・週・月単位の実績／予定時間グラフ、GitHub型の学習ヒートマップを追加しました。直近1年・年別表示、過去の週・月・年の表示、試験・期間での絞り込みに対応します。
@@ -21,9 +29,9 @@ Android 8.0（API 26）以降に対応します。Web版はリポジトリ直下
 
 ## ダウンロード
 
-[StudyCoPi Android 1.5.0 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.5.0/StudyCoPi-Android-1.5.0.apk) をダウンロードして、Android端末で開いてください。
+[StudyCoPi Android 1.5.1 APK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.5.1/StudyCoPi-Android-1.5.1.apk) をダウンロードして、Android端末で開いてください。
 インストール元のブラウザやファイルアプリに「不明なアプリのインストール」の許可が必要な場合があります。
-開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.5.0) にあります。
+開発用署名を使用したAPKです。変更内容とSHA-256チェックサムは [Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.5.1) にあります。
 
 ## 機能
 
@@ -36,7 +44,7 @@ Android 8.0（API 26）以降に対応します。Web版はリポジトリ直下
 - 曜日を指定できる目覚まし、計算問題 → NFCタグまたは追加の計算問題による2段階解除
 - 教科の追加・編集・色・並び替え
 - 学習予定の開始前・試験前日・タイマー終了のAndroid通知
-- JSONバックアップの保存・復元（Web版のv3と旧形式を読み込み可能）
+- JSONバックアップの保存・復元（Web版のv4・v3と旧形式を読み込み可能）
 
 ## 音源・時間割・ウィジェット（1.4）
 

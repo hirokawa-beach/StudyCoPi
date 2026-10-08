@@ -1,65 +1,88 @@
-# StudyCoPi(スタディコパイ)
-あなたの勉強スケジュールを勉強時のCopilot(副操縦士)として、サポートするWebアプリです。
+![StudyCoPi：今日の「やる」を、「できた」に。](assets/brand/banner.png)
 
-Android版は [android](android/) にあります。Kotlin + Jetpack Composeで実装しています。
-Android Studioで開き、実行・ビルドする方法は [Android版のREADME](android/README.md) を参照してください。
+<p align="center">
+  <a href="https://hirokawa-beach.github.io/StudyCoPi/"><strong>Web版を開く</strong></a> ·
+  <a href="https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.5.1/StudyCoPi-Android-1.5.1.apk"><strong>Android APK</strong></a> ·
+  <a href="https://hirokawa-beach.github.io/studycopi-guide/">紹介・使い方</a> ·
+  <a href="https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.5.1">v1.5.1 Release</a>
+</p>
 
-[Android版APK（1.5.0）をダウンロード](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.5.0/StudyCoPi-Android-1.5.0.apk) · [Releaseと変更内容](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.5.0)
+StudyCoPi（スタディコパイ）は、予定を立てるところから、集中して勉強し、振り返るところまでを支える学習管理アプリです。考査や模試を別々に管理し、今日やることと試験範囲の残りを見渡せます。Web版と、Kotlin・Jetpack Composeで作ったAndroid版があります。
 
-## v1.5.0
+## 勉強の流れを、ひとつに
 
-Web・Androidの統計に日・週・月単位の勉強時間グラフとGitHub型の学習ヒートマップを追加しました。
-直近1年・年別の表示、週・月・年の前後移動、試験と期間による絞り込み、マスや棒を選んだ時間の確認ができます。
-実績は学習記録の予定開始日に集計し、0分・30分未満・1時間未満・2時間未満・2時間以上の5段階で表示します。
-Androidのホーム画面ウィジェットはデジタル庁デザインシステムを参考に見直し、実績と予定の円グラフ、直近7日の棒グラフ、大きな時刻表示を追加しました。
-画面固定状態の遅延反映と、タイマーの秒表示の周期的な引っ掛かりも修正しています。
+| やりたいこと | StudyCoPiでできること |
+| :--- | :--- |
+| **予定を立てる** | 教科・日時・予定時間を登録。一覧と週間タイムテーブルを切り替えて確認。 |
+| **範囲を進める** | 試験・教科ごとのチェックリスト。未着手・途中・要復習・完了を管理し、残りだけに絞る。 |
+| **集中する** | 予定から、またはタイマー単独で開始。一時停止・再開・終了して記録。 |
+| **振り返る** | 日・週・月の棒グラフと、GitHubのような年間ヒートマップ。期間・試験・教科で絞り込み。 |
+| **ホーム画面で確認する** | Androidの6種類のウィジェット。円グラフ、7日間の棒グラフ、次の予定や目覚まし。 |
 
-## v1.4.1
+## 画面で見る
 
-- Androidウィジェットを6種類に追加：今日の学習、今日の予定、今日の勉強時間、累積予定時間と勉強時間、次の目覚まし、次の学習予定。長押しでサイズを変更すると表示も切り替わります。
-- Web・Androidの「その他 → StudyCoPiについて」に、バージョン、開発者、ライセンス、更新・報告ページを追加しました。
-- 起床問題は数学・英語・世界史・おまかせから選択できます。英語・世界史を各20問収録し、各ステップ1〜10問。英語・世界史は4択で、2段階を通じて同じ問題を繰り返しません。NFC解除も使えます。
-- 「その他 → 通知設定」で予定時刻の集中モードをオンにできます。タイマーを開始せずに集中画面を開き、「勉強を始める」で計測を開始します。完了済み、開始から5分以上経過した予定、計測中の別タイマーは対象外です。
-- Androidは前面で画面固定のOS確認を求め、バックグラウンドでは通常の通知から開きます。通常アプリは無断で他アプリを閉じたり、解除不可能な固定をしたりできません。Webは開いているページ内の集中画面で、端末全体は固定できません。
-- アカウント連携・自動同期は今回の対象外です。既存のJSONバックアップで端末間のデータを移行できます。
+<table>
+  <tr><th>今日の予定</th><th>試験範囲のチェック</th><th>Androidウィジェット</th></tr>
+  <tr>
+    <td width="33%"><img src="assets/screenshots/today.webp" alt="今日の予定から勉強を開始する画面" width="260"></td>
+    <td width="33%"><img src="assets/screenshots/checklist.webp" alt="進捗と絞り込みを固定し、範囲を一覧でチェックする画面" width="260"></td>
+    <td width="33%"><img src="assets/screenshots/widgets.webp" alt="異なる大きさに合わせた予定・勉強時間・次の予定のウィジェット" width="300"></td>
+  </tr>
+</table>
 
-## 音源・時間割・ウィジェット（1.4）
+![年間の勉強時間を緑の濃淡で表示する学習ヒートマップ](assets/screenshots/heatmap.webp)
 
-- WebとAndroidでベル・電子音・チャイムの3種類を選択・試聴できます。同じオリジナルWAV音源を共有します。
-- Androidの目覚ましでは端末の標準音と音声ファイルも選択できます。別の端末へ復元すると端末固有の音源は標準音に戻ります。
-- Webの音源設定は「その他 → 通知設定 → アラーム音」にあります。画面を開いている間のタイマー終了音に適用します。
-- Webのホーム画面・ブラウザ・通知アイコンをAndroid版と統一しました。
-- Webは最後のバックアップから3日以上経ち、変更がある場合だけ、次に開いた際にバックアップを案内します。「あとで」は24時間の延期です。初回は利用開始から3日を基準にします。
-- 両方の「予定 → 時間割」で縦軸が時間の週間表を開けます。短い予定の枠は教科名に合わせて伸び、表示が重なる予定は横に並びます。枠の先頭は実際の開始時刻です。
-- Androidの「その他 → ウィジェット」で、今日の予定3件と記録済みの勉強時間をホーム画面に追加できます。保存時に更新され、↻でも更新できます。
+画面はサンプルデータを使った実際のアプリです。詳しい操作は[紹介サイト](https://hirokawa-beach.github.io/studycopi-guide/)と、アプリ内の「その他 → 使い方」で確認できます。
 
-音源の原本は `shared/sounds/`、生成コードは `scripts/generate-sounds.py` にあります。WebはService Worker、AndroidはAPK assetsに保存するため、オフラインでも利用できます。
+## はじめる
 
-## チュートリアルと共通UI（1.3）
+**Web：** [Web版](https://hirokawa-beach.github.io/StudyCoPi/)を開き、「追加」から今日の予定をひとつ作ります。予定を作らず「集中タイマー」から始めることもできます。
 
-Web・Androidともに、初回に5ステップの使い方を表示します。
-試験の登録 → 予定の追加 → タイマー → 実績の記録 → 統計の順で、実際の画面を確認します。
-対象のボタンやカードをハイライトし、その近くに短い案内を重ねて表示します。
-記録の操作例は表示だけで、保存データに追加されません。
-「あとで」で閉じられ、初回終了後は「その他 → 使い方 → チュートリアルを見る」から再表示できます。
-使い方には操作別の説明と該当画面へのボタンもあります。チュートリアルは学習データを変更しません。
+**Android：** [v1.5.1のAPK](https://github.com/hirokawa-beach/StudyCoPi/releases/download/android-v1.5.1/StudyCoPi-Android-1.5.1.apk)を端末で開いてインストールします。Android 8.0以降に対応。インストール元のブラウザなどに「不明なアプリのインストール」の許可が必要な場合があります。配布APKは開発用署名です。[Release](https://github.com/hirokawa-beach/StudyCoPi/releases/tag/android-v1.5.1)に変更内容とSHA-256チェックサムを掲載しています。
 
-スマホ版WebはAndroidに合わせた5つのタブ（今日・予定・試験・統計・その他）、
-予定カード、配色、日本語フォント、週間の日付選択、円形タイマーを使用します。
-画面固定とNFC目覚ましはAndroid版で利用できます。学習データの端末間移行にはバックアップを使います。
+更新は上書きインストールしてください。先にアプリをアンインストールすると、端末内の学習データが削除されます。
 
-共通の説明文はリポジトリ直下の `shared/study-guide.json` が原本です。
-WebはService Workerでオフライン用に保存し、Androidは同じファイルをAPKのassetsに組み込みます。
-説明の更新時はこのファイルを編集し、初回ガイドを再表示する場合は `version` を増やします。
+## WebとAndroid
 
-<お知らせとお願いと言い訳> <br>
-最新バージョンはv0.0.1で、不安定版です。<br>
-考査一週間前に作ろうと思い立ったので、ひとまずAIにすべてを委ねました。<br>
-UIがひどいかもしれませんが、許してください。<br>
-考査終了して余裕ができたら自分でいろいろと改善していこうかなと思っています。 <br>
+| 機能 | Web | Android |
+| :--- | :---: | :---: |
+| 予定・時間割・考査／模試・範囲チェック | ✓ | ✓ |
+| 集中タイマー・実績・統計・ヒートマップ | ✓ | ✓ |
+| JSONバックアップの保存・復元 | ✓ | ✓ |
+| OSの画面固定・ホーム画面ウィジェット | 非対応 | ✓ |
+| 二段階目覚まし・NFCによる解除 | 非対応 | ✓ |
 
-このリポジトリを見ていただいている方へ、<br>
-(今のところは)人間の手がほとんど入っていないひどいWebアプリですが、<br>
-よければ使ってみてください。<br>
-Issuesもお待ちしております(すぐには対応できませんが)。<br>
-2026/06/27 ひろかわびーち
+Androidの目覚ましは数学・英語・世界史の問題に対応し、追加の問題や登録したNFCタグで解除できます。通知・アラーム・画面固定の利用は、端末の設定と許可に従います。
+
+学習データは各端末内に保存します。**アカウント連携や端末間の自動同期はありません。** 移行には「その他 → バックアップ」からJSONを書き出して復元してください。範囲チェックを含むバックアップはv4形式のため、Web・Androidとも1.5.1以降で復元します。旧形式のバックアップも読み込めます。
+
+## v1.5.1で変わったこと
+
+- 新しい本と時計のアイコンに統一し、紹介サイトとバナーも更新。
+- 範囲チェックを追加。全体の進捗を固定し、項目だけをスクロールして確認。
+- Androidウィジェットのサイズ追従を改善し、グラフを端末の画面密度に合わせて描画。
+- 予定なしで開始したタイマーは、終了時に必ず「完了」として記録。
+
+過去の更新は[変更履歴](CHANGELOG.md)にまとめています。
+
+## 開発する
+
+Web版はビルド不要のHTML・CSS・JavaScriptです。リポジトリのルートをローカルHTTPサーバーで配信して開いてください。Androidの構成・ビルド・検証手順は[Android版README](android/README.md)にあります。
+
+```sh
+# Webのデータモデルと統計のテスト（Node.js）
+node --test tests/study-model.test.cjs tests/checklist-model.test.cjs tests/statistics.test.cjs
+
+# Androidのテスト・検査・配布APK作成（Windows）
+android\gradlew.bat -p android :app:testDebugUnitTest :app:lintDebug :app:assembleLocal
+```
+
+共有の説明文は `shared/study-guide.json`、オリジナル音源は `shared/sounds/` が原本です。新アイコンのサイズ別書き出しには `scripts/export-brand-assets.py`（Pillow）を使います。
+
+## フィードバックとライセンス
+
+不具合や要望は[Issues](https://github.com/hirokawa-beach/StudyCoPi/issues)へ。再現手順とWeb／Androidのどちらかを添えてもらえると助かります。
+
+開発：[ひろかわびーち](https://hirokawa-beach.github.io/) · [MIT License](LICENSE)
+
+日本語フォントとアイコンのライセンスは[フォント](assets/fonts/OFL.txt)・[Material Icons](assets/MaterialIcons-LICENSE.txt)を参照してください。

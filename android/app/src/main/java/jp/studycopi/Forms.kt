@@ -206,7 +206,7 @@ private fun readableError(e: Throwable): String = when (e) {
             val g = data.examGroups.find { it.id == group }
             require(g == null || date in g.startDate..g.endDate) { "試験期間内の日付を選んでください" }
             require(start.isEmpty() || end.isEmpty() || end > start) { "終了時刻は開始時刻より後にしてください" }
-            val exam = ExamSession(id, subject.trim(), date, start, end, range, group)
+            val exam = ExamSession(id, subject.trim(), date, start, end, range, group, existing?.checklist.orEmpty())
             BackupCodec.validate(data.copy(exams = data.exams.filterNot { it.id == id } + exam))
             model.saveExam(exam); close()
         }.onFailure { error = readableError(it) }
@@ -219,6 +219,7 @@ private fun readableError(e: Throwable): String = when (e) {
         TimeField("開始時刻（任意）", start, optional = true) { start = it }
         TimeField("終了時刻（任意）", end, optional = true) { end = it }
         TextField("試験範囲・メモ（任意）", range, multiline = true) { range = it }
+        Text("保存後、教科の日程にある「範囲チェックリスト」から、単元やページごとの進捗を管理できます。", style = MaterialTheme.typography.bodySmall)
     }
 }
 

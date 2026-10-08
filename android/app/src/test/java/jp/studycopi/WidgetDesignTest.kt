@@ -44,8 +44,8 @@ class WidgetDesignTest {
                 assertTrue("$kind/$width/$height clipped view $id at $top height ${view.height}", top + view.height <= height - root.paddingBottom)
             }
         }
-        if (kind == WidgetKind.HOURS && height >= 130 || kind == WidgetKind.TOTAL && height >= 130 && (width < 220 || height >= 170)) assertEquals(View.VISIBLE, root.findViewById<View>(R.id.widget_chart).visibility)
-        if (kind == WidgetKind.TODAY && width >= 220 && height >= 130) assertEquals(View.VISIBLE, root.findViewById<View>(R.id.widget_ring).visibility)
+        if (kind == WidgetKind.HOURS && height >= 130 || kind == WidgetKind.TOTAL && height >= 220) assertEquals(View.VISIBLE, root.findViewById<View>(R.id.widget_chart).visibility)
+        if (kind == WidgetKind.TODAY && width >= 220 && height >= 180) assertEquals(View.VISIBLE, root.findViewById<View>(R.id.widget_ring).visibility)
         if (kind == WidgetKind.TOTAL) assertTrue(root.findViewById<TextView>(R.id.widget_label).text.toString().contains("15時間") || root.findViewById<TextView>(R.id.widget_row_1).text.toString().contains("15時間"))
         for (id in listOf(R.id.widget_date, R.id.widget_label, R.id.widget_hours, R.id.widget_row_1, R.id.widget_row_2, R.id.widget_more)) {
             val text = root.findViewById<TextView>(id)

@@ -40,11 +40,15 @@ class ReleaseWidgetTest {
         for (kind in WidgetKind.entries) for (height in if (kind in listOf(WidgetKind.HOURS, WidgetKind.ALARM, WidgetKind.NEXT)) listOf(70,140,320) else listOf(140,320)) {
             val width = if (kind in listOf(WidgetKind.HOURS, WidgetKind.ALARM, WidgetKind.TOTAL)) 170 else 350
             val content = widgetPresentation(data, kind, now)
-            val root = StudyWidget.presentationViews(app, kind, content, height).apply(app, LinearLayout(app))
+            val root = StudyWidget.presentationViews(app, kind, content, height, width).apply(app, LinearLayout(app))
             root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
             root.layout(0,0,width,height)
             val metric = root.findViewById<TextView>(R.id.widget_hours)
-            if (metric.visibility == View.VISIBLE) { assertTrue("$kind/$height metric clipped", metric.bottom <= height - root.paddingBottom); assertEquals(content.value, metric.text.toString()) }
+            if (metric.visibility == View.VISIBLE) {
+                assertTrue("$kind/$height metric clipped", metric.bottom <= height - root.paddingBottom)
+                if (kind == WidgetKind.PLANS) { assertTrue(metric.text.toString().contains("13:00")); assertTrue(root.findViewById<TextView>(R.id.widget_date).text.toString().contains("今日の予定")) }
+                else assertEquals(content.value, metric.text.toString())
+            }
             if (kind == WidgetKind.TOTAL) assertTrue(root.findViewById<TextView>(if (height < 280) R.id.widget_label else R.id.widget_row_1).text.toString().contains("4時間"))
             if (height == 140 && kind == WidgetKind.PLANS) assertTrue(root.findViewById<TextView>(R.id.widget_row_1).text.toString().contains("数学"))
             val bitmap = android.graphics.Bitmap.createBitmap(width,height,android.graphics.Bitmap.Config.ARGB_8888)

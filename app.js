@@ -534,7 +534,97 @@ function renderMobileDayList(base, now) {
 }
 function selectDay(date) { selectedDay = date; renderTimetable(); }
 function examSessionCard(e) {
-  return `<article class="exam-session"><div><span class="muted">${esc(groupName(e.examGroupId))}</span><h3>${esc(e.subject)}</h3><p>${fmtDate(e.date)} ${esc(e.startTime || "")}${e.endTime ? "〜" + esc(e.endTime) : ""}</p>${e.note ? `<p class="muted">${esc(e.note)}</p>` : ""}</div><button class="btn btn-sm" onclick="editExam('${e.id}')">編集</button></article>`;
+  const checklist = StudyModel.checklistTotals(e.checklist);
+  return `<article class="exam-session"><div><span class="muted">${esc(groupName(e.examGroupId))}</span><h3>${esc(e.subject)}</h3><p>${fmtDate(e.date)} ${esc(e.startTime || "")}${e.endTime ? "〜" + esc(e.endTime) : ""}</p>${e.note ? `<p class="muted">${esc(e.note)}</p>` : ""}<button type="button" class="btn" data-checklist-summary="${e.id}" onclick="openChecklist('${e.id}')">範囲チェックリスト · ${checklist.done} / ${checklist.count}件 完了</button></div><button class="btn btn-sm" onclick="editExam('${e.id}')">編集</button></article>`;
+}
+let checklistExamId = '';
+let checklistFilter = 'all';
+let checklistEditingId = '';
+let checklistDraftTitle = '';
+function openChecklist(id) {
+  const exam = exams.find(item => item.id === id);
+  if (!exam) return;
+  checklistExamId = id; checklistFilter = 'all'; checklistEditingId = '';
+  modalTrigger = document.activeElement;
+  document.getElementById('modal-content').classList.add('checklist-modal');
+  document.getElementById('modal-body').innerHTML = `<div class="modal-header checklist-header"><h2 id="modal-heading">試験範囲チェックリスト</h2><button type="button" class="btn" onclick="closeModal()">閉じる</button></div><div class="checklist-overview"><p class="checklist-context">${esc(groupName(exam.examGroupId))} · ${esc(exam.subject)}</p><p id="checklist-summary" aria-live="polite"></p><progress id="checklist-progress" aria-label="試験範囲の完了率"></progress><div class="checklist-filters" role="group" aria-label="表示する範囲">${[['all','すべて'],['remaining','未完了'],['review','要復習']].map(([key,label]) => `<button type="button" data-checklist-filter="${key}" onclick="setChecklistFilter('${key}')">${label}</button>`).join('')}</div><p id="checklist-error" role="alert" hidden></p></div><div class="checklist-scroll" id="checklist-scroll">${exam.note ? `<details class="checklist-range-note"><summary>範囲メモ</summary><p>${esc(exam.note)}</p></details>` : ''}<details id="checklist-add-panel" class="checklist-add-panel" ${exam.checklist?.length ? '' : 'open'}><summary>範囲を追加</summary><form onsubmit="event.preventDefault();addChecklistItems()"><label class="form-group">範囲を追加（1行1項目）<textarea id="checklist-add" rows="3" placeholder="問題集 p.20〜25&#10;問題集 p.26〜30"></textarea></label><p class="muted">単元・ページを1行ずつ入力すると、まとめて追加できます。</p><button type="submit" class="btn btn-primary">追加する</button></form></details><div id="checklist-items"></div></div>`;
+  renderChecklistItems(); activateModal();
+}
+function checklistError(message) {
+  const error = document.getElementById('checklist-error');
+  if (error) { error.textContent = message; error.hidden = !message; }
+}
+function saveChecklist(exam) {
+  save('sl_exams', exams);
+  const total = StudyModel.checklistTotals(exam.checklist);
+  document.querySelectorAll(`[data-checklist-summary="${exam.id}"]`).forEach(button => { button.textContent = `範囲チェックリスト · ${total.done} / ${total.count}件 完了`; });
+}
+function setChecklistFilter(filter) {
+  if (!['all','remaining','review'].includes(filter)) return;
+  checklistFilter = filter; checklistEditingId = ''; checklistError(''); renderChecklistItems();
+  document.getElementById('checklist-scroll').scrollTop = 0;
+}
+function renderChecklistItems() {
+  const exam = exams.find(item => item.id === checklistExamId);
+  if (!exam || !document.getElementById('checklist-items')) return;
+  const items = exam.checklist || [], total = StudyModel.checklistTotals(items), remaining = total.count - total.done;
+  document.getElementById('checklist-summary').textContent = `全${total.count}件 · 完了${total.done}件 · 未完了${remaining}件 · 要復習${total.review}件`;
+  document.getElementById('checklist-progress').max = total.count || 1;
+  document.getElementById('checklist-progress').value = total.done;
+  document.querySelectorAll('[data-checklist-filter]').forEach(button => {
+    const key=button.dataset.checklistFilter;
+    button.setAttribute('aria-pressed',String(checklistFilter===key));
+    button.textContent = `${key==='all'?'すべて':key==='remaining'?'未完了':'要復習'}（${key==='all'?total.count:key==='remaining'?remaining:total.review}）`;
+  });
+  const visible = items.filter(item => checklistFilter === 'all' || checklistFilter === 'remaining' && item.status !== 'done' || checklistFilter === 'review' && item.status === 'review');
+  document.getElementById('checklist-items').innerHTML = visible.length ? visible.map(item => `<article class="checklist-item" data-item-id="${item.id}"><div class="checklist-line"><label class="checklist-toggle"><input type="checkbox" aria-label="${esc(item.title)}を完了にする" ${item.status==='done'?'checked':''} onchange="setChecklistStatus('${item.id}',this.checked?'done':'pending')"></label><button type="button" class="checklist-title" aria-expanded="${checklistEditingId===item.id}" aria-controls="checklist-detail-${item.id}" onclick="openChecklistItem('${item.id}')">${esc(item.title)}</button><select class="checklist-status" aria-label="${esc(item.title)}の状況" onchange="setChecklistStatus('${item.id}',this.value)">${StudyModel.checklistStatuses.map(([key,label]) => `<option value="${key}" ${item.status===key?'selected':''}>${label}</option>`).join('')}</select></div>${checklistEditingId===item.id ? `<div class="checklist-detail" id="checklist-detail-${item.id}"><label class="form-group">範囲の名前<input type="text" value="${esc(checklistDraftTitle)}" maxlength="300" oninput="checklistDraftTitle=this.value"></label><div class="checklist-detail-actions"><button type="button" class="btn btn-primary" onclick="saveChecklistItemName('${item.id}')">保存</button><button type="button" class="btn" onclick="openChecklistItem('${item.id}')">キャンセル</button><button type="button" class="btn btn-quiet" onclick="deleteChecklistItem('${item.id}')">削除</button></div></div>` : ''}</article>`).join('') : `<p class="empty-state">${items.length ? 'この状況の項目はありません。' : 'まだ範囲がありません。問題集のページや単元を追加してください。'}</p>`;
+}
+function openChecklistItem(id) {
+  const item = exams.find(exam=>exam.id===checklistExamId)?.checklist?.find(item=>item.id===id);
+  if (!item) return;
+  if (checklistEditingId===id) checklistEditingId='';
+  else { checklistEditingId=id; checklistDraftTitle=item.title; }
+  checklistError(''); renderChecklistItems();
+  document.querySelector(`[data-item-id="${id}"] ${checklistEditingId ? 'input[type=text]' : '.checklist-title'}`)?.focus({preventScroll:true});
+}
+function saveChecklistItemName(id) {
+  if (!renameChecklistItem(id,checklistDraftTitle)) return;
+  checklistEditingId=''; renderChecklistItems();
+  document.querySelector(`[data-item-id="${id}"] .checklist-title`)?.focus({preventScroll:true});
+}
+function addChecklistItems() {
+  const exam=exams.find(item=>item.id===checklistExamId); if(!exam) return;
+  const input=document.getElementById('checklist-add'),titles=input.value.split(/\r?\n/).map(title=>title.trim()).filter(Boolean);
+  if(!titles.length || titles.some(title=>title.length>300)) return checklistError('範囲を1行ずつ入力してください（1行300文字まで）。');
+  if((exam.checklist?.length || 0)+titles.length>200) return checklistError('チェックリストは200件までです。');
+  exam.checklist=[...(exam.checklist || []),...titles.map(title=>({id:uid(),title,status:'pending'}))];
+  saveChecklist(exam);input.value='';checklistError('');renderChecklistItems();document.getElementById('checklist-add-panel').open=false;
+  document.querySelector('[data-checklist-filter="all"]').focus({preventScroll:true});
+}
+function setChecklistStatus(id,status) {
+  if(!StudyModel.checklistStatuses.some(item=>item[0]===status)) return;
+  const exam=exams.find(item=>item.id===checklistExamId),item=exam?.checklist?.find(item=>item.id===id);if(!item) return;
+  const checkbox=document.activeElement?.type==='checkbox';
+  item.status=status;saveChecklist(exam);renderChecklistItems();
+  const target=document.querySelector(`[data-item-id="${id}"] ${checkbox?'input[type=checkbox]':'select'}`) || document.querySelector(`[data-checklist-filter="${checklistFilter}"]`);
+  target?.focus({preventScroll:true});
+}
+function renameChecklistItem(id,title) {
+  const exam=exams.find(item=>item.id===checklistExamId),item=exam?.checklist?.find(item=>item.id===id);if(!item) return false;
+  if(!title.trim() || title.trim().length>300){checklistError('範囲の名前を確認してください。');return false;}
+  item.title=title.trim();saveChecklist(exam);checklistError('');return true;
+}
+function deleteChecklistItem(id) {
+  const exam=exams.find(item=>item.id===checklistExamId);if(!exam) return;
+  const index=exam.checklist?.findIndex(item=>item.id===id) ?? -1;if(index<0) return;
+  const [previous]=exam.checklist.splice(index,1);checklistEditingId='';saveChecklist(exam);renderChecklistItems();
+  document.querySelector(`[data-checklist-filter="${checklistFilter}"]`)?.focus({preventScroll:true});
+  toast('範囲を削除しました',()=>{
+    const current=exams.find(item=>item.id===exam.id);if(!current || current.checklist?.some(item=>item.id===id)) return;
+    current.checklist ||= [];if(current.checklist.length>=200) return;
+    current.checklist.splice(Math.min(index,current.checklist.length),0,previous);saveChecklist(current);
+    if(checklistExamId===current.id) renderChecklistItems();
+  });
 }
 function renderExams() {
   const html = [...exams].sort((a,b) => a.date.localeCompare(b.date)).map(examSessionCard).join("") || '<p class="muted">教科別の日程はまだありません。試験ごとの管理から登録できます。</p>';
@@ -880,14 +970,12 @@ function finishFocusAuto(elapsed) {
 }
 
 function recordFocusSession(elapsedSec) {
-  const hrs = Math.round(elapsedSec / 36) / 100;
-  if (focusSchedId) {
-    const s = schedules.find((s) => s.id === focusSchedId);
-    if (s) {
+  const hrs = Math.max(0, Math.min(elapsedSec, focusTargetSec)) / 3600;
+  const s = focusSchedId ? schedules.find((item) => item.id === focusSchedId) : null;
+  if (s) {
       s.actualDuration = Math.round((StudyModel.actualHours(s) + hrs) * 100) / 100;
       s.status = s.actualDuration + 0.001 >= Number(s.duration) ? "done" : "partial";
-    }
-  } else if (hrs > 0) schedules.push({ id:uid(), subjectId:focusSubjectId, examGroupId:focusExamGroupId || undefined, datetime:new Date(focusSessionStart).toISOString(), duration:hrs, actualDuration:hrs, content:"集中モードで記録", note:"", status:"done" });
+  } else schedules.push({ id:uid(), subjectId:focusSubjectId, examGroupId:focusExamGroupId || undefined, datetime:new Date(focusSessionStart).toISOString(), duration:hrs, actualDuration:hrs, content:"集中モードで記録", note:"", status:"done" });
   save("sl_schedules", schedules);
   focusTimer = null;
   document.body.classList.remove("timer-running");
@@ -932,7 +1020,7 @@ function renderData() {
 
 function exportData() {
   const payload = {
-    version: 3,
+    version: exams.some(exam => exam.checklist?.length) ? 4 : 3,
     app: APP_NAME,
     exportedAt: new Date().toISOString(),
     web: typeof webSound !== "undefined" ? {sound: webSound, scheduledFocus: typeof scheduledFocusEnabled !== "undefined" && scheduledFocusEnabled} : {},
@@ -1043,6 +1131,7 @@ function modalLayout(title, fields, submit, extra = "") {
   return `<div class="modal-header"><h2 id="modal-heading">${title}</h2><button type="button" class="btn btn-quiet" onclick="closeModal()" aria-label="入力画面を閉じる">閉じる</button></div><form id="modal-form" onsubmit="event.preventDefault();${submit}"><div class="form-grid">${fields}</div><p id="form-error" role="alert" class="form-error" hidden></p><div class="modal-footer">${extra}<button type="button" class="btn" onclick="closeModal()">キャンセル</button><button type="submit" class="btn btn-primary">保存</button></div></form>`;
 }
 function openModal(type, data = {}) {
+  document.getElementById("modal-content").classList.remove("checklist-modal");
   modalTrigger = document.activeElement;
   const body = document.getElementById("modal-body");
   if (type === "schedule") {
@@ -1110,6 +1199,7 @@ function pickColor(el, color) {
 function closeModal(e) {
   if (e && e.target !== document.getElementById("modal-backdrop")) return;
   document.getElementById("modal-backdrop").classList.remove("open");
+  document.getElementById("modal-content").classList.remove("checklist-modal");
   document.body.classList.remove("modal-open");
   document.querySelectorAll(".app, .mobile-header, .mobile-bottom-nav, .running-focus").forEach((el) => el.inert = false);
   if (modalTrigger?.isConnected) modalTrigger.focus();
@@ -1165,7 +1255,8 @@ function saveExam(id) {
   if (endTime && (!startTime || endTime <= startTime)) return formError("終了時刻は開始時刻より後にしてください");
   const group = examGroups.find((g) => g.id === examGroupId);
   if (group && (date < group.startDate || date > group.endDate)) return formError("日付は対象の試験期間内を選んでください");
-  const obj = {id:id || uid(), subject, date, startTime, endTime, examGroupId:examGroupId || undefined, note:document.getElementById("m-enote").value.trim()};
+  const previous = exams.find(exam => exam.id === id);
+  const obj = {...previous, id:id || uid(), subject, date, startTime, endTime, examGroupId:examGroupId || undefined, note:document.getElementById("m-enote").value.trim()};
   const index = exams.findIndex((e) => e.id === id);
   if (index >= 0) exams[index] = obj; else exams.push(obj);
   save("sl_exams", exams); closeModal(); render(); toast("教科別の日程を保存しました");

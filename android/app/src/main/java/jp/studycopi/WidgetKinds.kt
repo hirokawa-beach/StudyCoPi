@@ -13,11 +13,15 @@ enum class WidgetKind(val title: String, val sizes: String, val route: String) {
     ALARM("次の目覚まし", "2×1・2×2", "wake"),
     NEXT("次の学習予定", "4×1・4×2", "plans")
 }
-data class WidgetPresentation(val title: String, val label: String, val value: String, val rows: List<String>, val empty: String, val more: String, val visual: WidgetVisual? = null)
+data class WidgetEntry(val time: String, val subject: String, val detail: String)
+data class WidgetPresentation(val title: String, val label: String, val value: String, val rows: List<String>, val empty: String, val more: String, val visual: WidgetVisual? = null, val entries: List<WidgetEntry> = emptyList())
 fun widgetPresentation(data: StudyData, kind: WidgetKind, now: LocalDateTime = LocalDateTime.now()): WidgetPresentation {
     val content = widgetContent(data, now.toLocalDate())
     val todayPlans = data.schedules.filter { it.date == now.toLocalDate() && !it.finished }
     val todayExams = data.exams.count { it.date == now.toLocalDate().toString() }
+    val entries = (todayPlans.map { WidgetEntry(dateTime(it.datetime).toLocalTime().toString().take(5), data.subject(it.subjectId).name,
+        listOf(hoursText(it.duration), it.content).filter { text -> text.isNotBlank() }.joinToString(" · ")) } +
+        data.exams.filter { it.date == now.toLocalDate().toString() }.map { WidgetEntry(it.startTime.ifBlank { "時刻未定" }, "${it.subject}（試験）", it.range) }).sortedBy { it.time }
     val presentation = when (kind) {
         WidgetKind.TODAY -> WidgetPresentation(content.date, "今日の勉強時間 · 記録済み", content.studied, content.rows,
             "今日の予定はありません", if (content.remaining > 0) "ほか${content.remaining}件 · 今日を開く ›" else "今日の学習を開く ›")
@@ -39,7 +43,7 @@ fun widgetPresentation(data: StudyData, kind: WidgetKind, now: LocalDateTime = L
                 plan?.let { listOf("${hoursText(it.duration)}  ${it.content}") } ?: emptyList(), "", "予定を開く ›")
         }
     }
-    return presentation.copy(visual = widgetVisual(data, kind, now.toLocalDate()))
+    return presentation.copy(visual = widgetVisual(data, kind, now.toLocalDate()), entries = if (kind in listOf(WidgetKind.TODAY, WidgetKind.PLANS)) entries else emptyList())
 }
 
 class TodayPlansWidget : StudyWidget() { override val kind = WidgetKind.PLANS }
